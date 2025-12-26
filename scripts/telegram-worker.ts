@@ -65,10 +65,12 @@ async function connectDB() {
     console.log(`🔌 Connecting to MongoDB...`);
     const uriPreview = MONGODB_URI ? `${MONGODB_URI.substring(0, 30)}...` : 'not set';
     console.log(`   URI preview: ${uriPreview}`);
-    console.log(`   Database name (MONGODB_DB): ${MONGODB_DB}`);
+    console.log(`   Note: Using default database from URI (same as Vercel app)`);
 
+    // KHÔNG dùng dbName option - để MongoDB tự detect database từ URI hoặc dùng default
+    // Giống như Vercel app (lib/db.ts) để đảm bảo cùng database
     await mongoose.connect(MONGODB_URI!, {
-      dbName: MONGODB_DB,
+      // dbName: MONGODB_DB,  // REMOVED - use same database as Vercel app
       bufferCommands: false,
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
