@@ -1,4 +1,4 @@
-import { Client, LocalAuth, Message as WhatsAppMessage, QRCode } from 'whatsapp-web.js';
+import { Client, LocalAuth, Message as WhatsAppMessage } from 'whatsapp-web.js';
 import connectDB from '@/lib/db';
 import BotSettings from '@/lib/models/BotSettings';
 import Message from '@/lib/models/Message';
