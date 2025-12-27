@@ -231,8 +231,32 @@ async function startClient(botId: string) {
         '--no-first-run',
         '--no-zygote',
         '--single-process',
-        '--disable-gpu'
-      ]
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-breakpad',
+        '--disable-client-side-phishing-detection',
+        '--disable-default-apps',
+        '--disable-features=TranslateUI',
+        '--disable-hang-monitor',
+        '--disable-ipc-flooding-protection',
+        '--disable-popup-blocking',
+        '--disable-prompt-on-repost',
+        '--disable-renderer-backgrounding',
+        '--disable-sync',
+        '--metrics-recording-only',
+        '--mute-audio',
+        '--no-default-browser-check',
+        '--no-first-run',
+        '--safebrowsing-disable-auto-update',
+        '--enable-automation',
+        '--password-store=basic',
+        '--use-mock-keychain'
+      ],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (process.platform === 'linux' ? '/usr/bin/chromium' : undefined)
     }
   });
 
