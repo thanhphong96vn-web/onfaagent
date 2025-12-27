@@ -52,6 +52,18 @@ export interface IMessengerSettings {
   webhookSetAt?: Date;
 }
 
+export interface IWhatsAppSettings {
+  enabled: boolean;
+  accessToken?: string;
+  phoneNumberId?: string;
+  businessAccountId?: string;
+  verifyToken?: string;
+  webhookUrl?: string;
+  webhookSetAt?: Date;
+  phoneNumber?: string;
+  verifiedName?: string;
+}
+
 export interface IBotSettings extends Document {
   botId: string;
   userId: string;
@@ -65,6 +77,7 @@ export interface IBotSettings extends Document {
   categories: string[];
   telegram?: ITelegramSettings;
   messenger?: IMessengerSettings;
+  whatsapp?: IWhatsAppSettings;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -148,6 +161,17 @@ const BotSettingsSchema = new Schema<IBotSettings>({
     pageName: { type: String },
     webhookUrl: { type: String },
     webhookSetAt: { type: Date }
+  },
+  whatsapp: {
+    enabled: { type: Boolean, default: false },
+    accessToken: { type: String },
+    phoneNumberId: { type: String },
+    businessAccountId: { type: String },
+    verifyToken: { type: String },
+    webhookUrl: { type: String },
+    webhookSetAt: { type: Date },
+    phoneNumber: { type: String },
+    verifiedName: { type: String }
   }
 }, {
   timestamps: true
@@ -157,6 +181,9 @@ const BotSettingsSchema = new Schema<IBotSettings>({
 BotSettingsSchema.index({ botId: 1, 'telegram.enabled': 1 });
 BotSettingsSchema.index({ botId: 1, 'telegram.botToken': 1 });
 BotSettingsSchema.index({ 'telegram.enabled': 1, 'telegram.botToken': 1 });
+BotSettingsSchema.index({ botId: 1, 'whatsapp.enabled': 1 });
+BotSettingsSchema.index({ botId: 1, 'whatsapp.accessToken': 1 });
+BotSettingsSchema.index({ 'whatsapp.enabled': 1, 'whatsapp.accessToken': 1 });
 
 // Prevent re-compilation during development
 export default mongoose.models.BotSettings || mongoose.model<IBotSettings>('BotSettings', BotSettingsSchema);

@@ -204,6 +204,8 @@ export function generateSystemPrompt(botSettings: IBotSettings, platform?: strin
   
   const platformContext = platform === 'telegram' 
     ? 'Provide informative answers with key details. Balance between being comprehensive and concise.'
+    : platform === 'whatsapp'
+    ? 'Provide informative answers with key details. Balance between being comprehensive and concise.'
     : platform === 'facebook' || platform === 'zalo'
     ? 'Be friendly and engaging.'
     : '';
@@ -222,7 +224,7 @@ Instructions:
 - If the knowledge base contains information about the topic, provide a complete answer
 - Only say "I don't have that information" if the knowledge base truly doesn't contain relevant information
 - Be helpful, friendly, and professional
-- For Telegram: Provide informative answers (3-6 sentences) with key details
+- For Telegram/WhatsApp: Provide informative answers (3-6 sentences) with key details
 - ${platformContext}`;
   
   // Debug: Log prompt length

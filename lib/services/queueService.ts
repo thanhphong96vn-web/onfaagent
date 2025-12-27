@@ -24,6 +24,12 @@ export interface TelegramQueueMessage {
   timestamp: number;
 }
 
+export interface WhatsAppQueueMessage {
+  webhookData: any; // WhatsApp webhook data
+  botId?: string;
+  timestamp: number;
+}
+
 /**
  * Add Telegram message to queue for async processing
  */
@@ -66,6 +72,52 @@ export async function queueTelegramMessage(
     return true;
   } catch (error) {
     console.error('❌ Error queueing Telegram message:', error);
+    return false;
+  }
+}
+
+/**
+ * Add WhatsApp message to queue for async processing
+ */
+export async function queueWhatsAppMessage(
+  webhookData: any,
+  botId?: string
+): Promise<boolean> {
+  const client = getQStashClient();
+  
+  if (!client) {
+    // Fallback: if queue not configured, return false to process synchronously
+    return false;
+  }
+
+  try {
+    const queueMessage: WhatsAppQueueMessage = {
+      webhookData,
+      botId,
+      timestamp: Date.now(),
+    };
+
+    // Get the worker endpoint URL
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXTAUTH_URL || process.env.WEBHOOK_URL || 'http://localhost:3000';
+    
+    const workerUrl = `${baseUrl}/api/whatsapp/worker`;
+
+    // Send message to queue
+    await client.publishJSON({
+      url: workerUrl,
+      body: queueMessage,
+      // Retry configuration
+      retries: 3,
+      // Timeout for processing (60 seconds)
+      timeout: 60,
+    });
+
+    console.log('✅ WhatsApp message queued successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Error queueing WhatsApp message:', error);
     return false;
   }
 }
