@@ -242,8 +242,21 @@ async function startClient(botId: string) {
     try {
       const qrDataUrl = await qrcode.toDataURL(qr);
       console.log(`✅ QR Code generated (data URL length: ${qrDataUrl.length})`);
+      
+      // Lưu QR code vào MongoDB
+      await connectDB();
+      await BotSettings.updateOne(
+        { botId },
+        {
+          $set: {
+            'whatsapp.qrCode': qrDataUrl,
+            'whatsapp.qrCodeExpiresAt': new Date(Date.now() + 5 * 60 * 1000) // 5 phút
+          }
+        }
+      );
+      
+      console.log(`✅ QR Code saved to database for bot: ${botId}`);
       console.log(`💡 Please scan the QR code with WhatsApp to authenticate`);
-      // In production, you might want to save this to a file or send it via API
     } catch (error) {
       console.error('❌ Error generating QR code image:', error);
       console.log(`📱 QR Code (raw): ${qr.substring(0, 100)}...`);
@@ -251,11 +264,32 @@ async function startClient(botId: string) {
   });
 
   // Handle authentication success
-  client.on('ready', () => {
+  client.on('ready', async () => {
     console.log(`✅ WhatsApp Web client ready for bot: ${botId}`);
     if (client.info) {
       console.log(`   Phone: ${client.info.wid.user}`);
       console.log(`   Name: ${client.info.pushname || 'N/A'}`);
+    }
+    
+    // Lưu thông tin phone và xóa QR code khỏi database khi đã authenticated
+    try {
+      await connectDB();
+      await BotSettings.updateOne(
+        { botId },
+        {
+          $set: {
+            'whatsapp.phoneNumber': client.info?.wid.user || '',
+            'whatsapp.verifiedName': client.info?.pushname || ''
+          },
+          $unset: {
+            'whatsapp.qrCode': '',
+            'whatsapp.qrCodeExpiresAt': ''
+          }
+        }
+      );
+      console.log(`✅ Phone number and name saved, QR code cleared for bot: ${botId}`);
+    } catch (error) {
+      console.error('❌ Error updating bot settings:', error);
     }
   });
 

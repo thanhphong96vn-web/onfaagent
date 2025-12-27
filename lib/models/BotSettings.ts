@@ -62,6 +62,8 @@ export interface IWhatsAppSettings {
   webhookSetAt?: Date;
   phoneNumber?: string;
   verifiedName?: string;
+  qrCode?: string;
+  qrCodeExpiresAt?: Date;
 }
 
 export interface IBotSettings extends Document {
@@ -171,7 +173,9 @@ const BotSettingsSchema = new Schema<IBotSettings>({
     webhookUrl: { type: String },
     webhookSetAt: { type: Date },
     phoneNumber: { type: String },
-    verifiedName: { type: String }
+    verifiedName: { type: String },
+    qrCode: { type: String },
+    qrCodeExpiresAt: { type: Date }
   }
 }, {
   timestamps: true
