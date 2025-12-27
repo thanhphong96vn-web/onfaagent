@@ -5,6 +5,7 @@ import connectDB from '@/lib/db';
 import BotSettings from '@/lib/models/BotSettings';
 import { invalidateBotSettingsCache } from '@/lib/services/telegramService';
 import { invalidateKnowledgeBaseCache } from '@/lib/services/chatService';
+import { invalidateWhatsAppWebBotSettingsCache } from '@/lib/services/whatsappWebService';
 
 export async function GET(request: NextRequest) {
   try {
@@ -111,7 +112,9 @@ export async function POST(request: NextRequest) {
 
     // Invalidate all caches when settings are updated
     invalidateBotSettingsCache(botId);
+    invalidateWhatsAppWebBotSettingsCache(botId);
     invalidateKnowledgeBaseCache(botId);
+    console.log(`✅ Invalidated all caches for bot: ${botId}`);
 
     return NextResponse.json(botSettings);
 

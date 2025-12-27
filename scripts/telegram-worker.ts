@@ -108,8 +108,14 @@ async function getBotSettings(botId?: string): Promise<any | null> {
     const cacheKey = `telegram_${normalizedBotId}`;
     const cached = botSettingsCache.get(cacheKey);
     
+    // Check cache validity - also reload if cache is older than 30 seconds to catch recent updates
     if (cached && Date.now() - cached.timestamp < BOT_SETTINGS_CACHE_TTL) {
-      return cached.settings;
+      const cacheAge = Date.now() - cached.timestamp;
+      if (cacheAge > 30000) { // 30 seconds - reload to catch recent document additions
+        console.log(`🔄 Cache is ${Math.round(cacheAge / 1000)}s old, reloading bot settings for: ${normalizedBotId}`);
+      } else {
+        return cached.settings;
+      }
     }
 
     const botSettings = await BotSettings.findOne({
@@ -120,6 +126,7 @@ async function getBotSettings(botId?: string): Promise<any | null> {
 
     if (botSettings) {
       botSettingsCache.set(cacheKey, { settings: botSettings, timestamp: Date.now() });
+      console.log(`✅ Loaded bot settings from DB for: ${normalizedBotId} (${botSettings.documents?.length || 0} documents)`);
     }
 
     return botSettings;
