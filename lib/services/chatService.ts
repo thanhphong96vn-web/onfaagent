@@ -60,8 +60,8 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
     knowledgeBase += 'FAQs:\n' + faqsText + '\n\n';
   }
 
-  // Add enabled documents - Load more documents for better coverage
-  const enabledDocuments = (botSettings.documents?.filter((doc: any) => doc.enabled) || []).slice(0, 10);
+  // Add enabled documents - Load ALL enabled documents (no limit)
+  const enabledDocuments = (botSettings.documents?.filter((doc: any) => doc.enabled) || []);
   if (enabledDocuments.length > 0) {
     knowledgeBase += 'Document Knowledge Base:\n';
     enabledDocuments.forEach((doc: any) => {
@@ -71,14 +71,11 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
       knowledgeBase += `\n--- ${doc.name} (${doc.type.toUpperCase()}) ---\n`;
       knowledgeBase += content + '\n';
     });
-    if ((botSettings.documents?.filter((doc: any) => doc.enabled) || []).length > 10) {
-      knowledgeBase += '\n[Additional documents available but not loaded]\n';
-    }
     knowledgeBase += '\n';
   }
 
-  // Add enabled URLs - Load more URLs for better coverage
-  const enabledUrls = (botSettings.urls?.filter((url: any) => url.enabled) || []).slice(0, 5);
+  // Add enabled URLs - Load ALL enabled URLs (no limit)
+  const enabledUrls = (botSettings.urls?.filter((url: any) => url.enabled) || []);
   if (enabledUrls.length > 0) {
     knowledgeBase += 'Web Content Knowledge Base:\n';
     enabledUrls.forEach((url: any) => {
@@ -88,14 +85,11 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
       knowledgeBase += `\n--- ${url.title} (${url.url}) ---\n`;
       knowledgeBase += content + '\n';
     });
-    if ((botSettings.urls?.filter((url: any) => url.enabled) || []).length > 5) {
-      knowledgeBase += '\n[Additional URLs available but not loaded]\n';
-    }
     knowledgeBase += '\n';
   }
 
-  // Add enabled structured data - Load more for better coverage
-  const enabledStructuredData = (botSettings.structuredData?.filter((data: any) => data.enabled) || []).slice(0, 5);
+  // Add enabled structured data - Load ALL enabled structured data (no limit)
+  const enabledStructuredData = (botSettings.structuredData?.filter((data: any) => data.enabled) || []);
   if (enabledStructuredData.length > 0) {
     knowledgeBase += 'Structured Data Knowledge Base:\n';
     enabledStructuredData.forEach((data: any) => {
@@ -106,9 +100,6 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
       knowledgeBase += `\n--- ${data.name} (${data.type}) ---\n`;
       knowledgeBase += truncatedData + '\n';
     });
-    if ((botSettings.structuredData?.filter((data: any) => data.enabled) || []).length > 5) {
-      knowledgeBase += '\n[Additional structured data available but not loaded]\n';
-    }
     knowledgeBase += '\n';
   }
 
