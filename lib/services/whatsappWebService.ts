@@ -117,7 +117,7 @@ export async function initializeWhatsAppWebClient(botId: string): Promise<{
     });
 
     // Handle incoming messages
-    client.on('message', async (msg: WhatsAppMessage) => {
+    client.on('message', async (msg: any) => {
       try {
         await handleWhatsAppWebMessage(botId, msg);
       } catch (error) {
@@ -258,15 +258,16 @@ export async function sendWhatsAppWebMessage(
 /**
  * Handle incoming WhatsApp Web message
  */
-async function handleWhatsAppWebMessage(botId: string, msg: WhatsAppMessage) {
+async function handleWhatsAppWebMessage(botId: string, msg: any) {
   // Ignore status messages and group messages
-  if (msg.from === 'status@broadcast' || msg.isGroupMsg) {
+  // Group chat IDs end with @g.us, personal chats end with @c.us
+  if (msg.from === 'status@broadcast' || msg.from.endsWith('@g.us')) {
     return;
   }
 
   const from = msg.from.replace('@c.us', '');
   const text = msg.body || '';
-  const messageId = msg.id._serialized;
+  const messageId = (msg.id as any)?._serialized || msg.id?.toString() || '';
 
   console.log(`📨 WhatsApp Web message received: from=${from}, text="${text.substring(0, 50)}..."`);
 

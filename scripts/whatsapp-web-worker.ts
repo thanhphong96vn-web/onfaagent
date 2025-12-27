@@ -115,7 +115,8 @@ async function sendMessage(client: Client, to: string, message: string): Promise
  */
 async function handleMessage(client: Client, botSettings: any, msg: any) {
   // Ignore status messages and group messages
-  if (msg.from === 'status@broadcast' || msg.isGroupMsg) {
+  // Group chat IDs end with @g.us, personal chats end with @c.us
+  if (msg.from === 'status@broadcast' || msg.from.endsWith('@g.us')) {
     return;
   }
 
