@@ -80,13 +80,9 @@ export async function POST(request: NextRequest) {
       // Continue even if webhook setup fails - user can configure in Meta Business Suite
     }
 
-    // Update bot settings in database using native MongoDB update
-    const db = (await import('mongoose')).connection.db;
-    const collectionName = BotSettings.collection.name;
-    const collection = db.collection(collectionName);
-    
-    console.log(`🔧 Using MongoDB native update for WhatsApp...`);
-    const updateResult = await collection.updateOne(
+    // Update bot settings in database
+    console.log(`🔧 Updating WhatsApp settings...`);
+    const updateResult = await BotSettings.updateOne(
       { botId: botSettings.botId },
       {
         $set: {
@@ -102,7 +98,7 @@ export async function POST(request: NextRequest) {
       }
     );
     
-    console.log(`✅ MongoDB native update result:`, {
+    console.log(`✅ MongoDB update result:`, {
       matchedCount: updateResult.matchedCount,
       modifiedCount: updateResult.modifiedCount,
       acknowledged: updateResult.acknowledged
