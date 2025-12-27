@@ -45,11 +45,11 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
   }
 
   let knowledgeBase = '';
-  // Reduced limits for faster processing
-  const MAX_DOC_LENGTH = maxLength ? Math.min(1500, maxLength / 3) : 1500; // Max chars per document
-  const MAX_URL_LENGTH = maxLength ? Math.min(1500, maxLength / 3) : 1500; // Max chars per URL
-  const MAX_STRUCTURED_LENGTH = maxLength ? Math.min(800, maxLength / 4) : 800; // Max chars per structured data
-  const MAX_FAQS_LENGTH = maxLength ? Math.min(3000, maxLength / 2) : 3000; // Max chars for FAQs
+  // Increased limits for better knowledge coverage
+  const MAX_DOC_LENGTH = maxLength ? Math.min(5000, maxLength / 4) : 5000; // Max chars per document (increased)
+  const MAX_URL_LENGTH = maxLength ? Math.min(3000, maxLength / 5) : 3000; // Max chars per URL (increased)
+  const MAX_STRUCTURED_LENGTH = maxLength ? Math.min(2000, maxLength / 6) : 2000; // Max chars per structured data (increased)
+  const MAX_FAQS_LENGTH = maxLength ? Math.min(8000, maxLength / 2) : 8000; // Max chars for FAQs (increased)
 
   // Add FAQs - Limit total length for performance
   if (botSettings.faqs.length > 0) {
@@ -60,8 +60,8 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
     knowledgeBase += 'FAQs:\n' + faqsText + '\n\n';
   }
 
-  // Add enabled documents - Limit to first 3 documents for speed
-  const enabledDocuments = (botSettings.documents?.filter((doc: any) => doc.enabled) || []).slice(0, 3);
+  // Add enabled documents - Load more documents for better coverage
+  const enabledDocuments = (botSettings.documents?.filter((doc: any) => doc.enabled) || []).slice(0, 10);
   if (enabledDocuments.length > 0) {
     knowledgeBase += 'Document Knowledge Base:\n';
     enabledDocuments.forEach((doc: any) => {
@@ -71,14 +71,14 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
       knowledgeBase += `\n--- ${doc.name} (${doc.type.toUpperCase()}) ---\n`;
       knowledgeBase += content + '\n';
     });
-    if ((botSettings.documents?.filter((doc: any) => doc.enabled) || []).length > 3) {
-      knowledgeBase += '\n[Additional documents available but not loaded for performance]\n';
+    if ((botSettings.documents?.filter((doc: any) => doc.enabled) || []).length > 10) {
+      knowledgeBase += '\n[Additional documents available but not loaded]\n';
     }
     knowledgeBase += '\n';
   }
 
-  // Add enabled URLs - Limit to first 2 URLs for speed
-  const enabledUrls = (botSettings.urls?.filter((url: any) => url.enabled) || []).slice(0, 2);
+  // Add enabled URLs - Load more URLs for better coverage
+  const enabledUrls = (botSettings.urls?.filter((url: any) => url.enabled) || []).slice(0, 5);
   if (enabledUrls.length > 0) {
     knowledgeBase += 'Web Content Knowledge Base:\n';
     enabledUrls.forEach((url: any) => {
@@ -88,14 +88,14 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
       knowledgeBase += `\n--- ${url.title} (${url.url}) ---\n`;
       knowledgeBase += content + '\n';
     });
-    if ((botSettings.urls?.filter((url: any) => url.enabled) || []).length > 2) {
-      knowledgeBase += '\n[Additional URLs available but not loaded for performance]\n';
+    if ((botSettings.urls?.filter((url: any) => url.enabled) || []).length > 5) {
+      knowledgeBase += '\n[Additional URLs available but not loaded]\n';
     }
     knowledgeBase += '\n';
   }
 
-  // Add enabled structured data - Limit to first 2 for speed
-  const enabledStructuredData = (botSettings.structuredData?.filter((data: any) => data.enabled) || []).slice(0, 2);
+  // Add enabled structured data - Load more for better coverage
+  const enabledStructuredData = (botSettings.structuredData?.filter((data: any) => data.enabled) || []).slice(0, 5);
   if (enabledStructuredData.length > 0) {
     knowledgeBase += 'Structured Data Knowledge Base:\n';
     enabledStructuredData.forEach((data: any) => {
@@ -106,8 +106,8 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
       knowledgeBase += `\n--- ${data.name} (${data.type}) ---\n`;
       knowledgeBase += truncatedData + '\n';
     });
-    if ((botSettings.structuredData?.filter((data: any) => data.enabled) || []).length > 2) {
-      knowledgeBase += '\n[Additional structured data available but not loaded for performance]\n';
+    if ((botSettings.structuredData?.filter((data: any) => data.enabled) || []).length > 5) {
+      knowledgeBase += '\n[Additional structured data available but not loaded]\n';
     }
     knowledgeBase += '\n';
   }
@@ -212,22 +212,25 @@ export function generateSystemPrompt(botSettings: IBotSettings, platform?: strin
   console.log(`   Has URLs: ${knowledgeBase.includes('Web Content Knowledge Base:')}`);
   
   const platformContext = platform === 'telegram' 
-    ? 'Keep responses concise for mobile.'
+    ? 'Provide detailed and complete answers based on the knowledge base. Include all relevant information from documents, FAQs, and other sources.'
     : platform === 'facebook' || platform === 'zalo'
     ? 'Be friendly and engaging.'
     : '';
 
-  // Shorter, more efficient prompt structure - optimized for speed
-  const prompt = `You are ${botSettings.name}, a helpful chatbot.
+  // Enhanced prompt structure for comprehensive responses
+  const prompt = `You are ${botSettings.name}, a helpful and knowledgeable chatbot.
 
 Knowledge Base:
 ${knowledgeBase}
 
-Rules:
-- Answer based on the knowledge base above
-- Be helpful, friendly, professional
-- If unsure, say "I don't have that information. Please contact support."
-- Keep responses relevant and concise (max 2-3 sentences for Telegram)
+Instructions:
+- Answer questions based EXACTLY on the knowledge base above
+- Provide COMPLETE and DETAILED answers with all relevant information
+- Include specific details, examples, and explanations from the knowledge base
+- If the knowledge base contains information about the topic, provide a thorough answer
+- Only say "I don't have that information" if the knowledge base truly doesn't contain relevant information
+- Be helpful, friendly, and professional
+- For Telegram: Provide detailed answers but organize them clearly
 - ${platformContext}`;
   
   // Debug: Log prompt length
@@ -302,10 +305,10 @@ export async function processChatMessage(
   const openai = getOpenAIClient(apiKey);
   const startTime = Date.now();
 
-  // Try with optimized knowledge base first (reduced size for speed)
+  // Try with optimized knowledge base first
   try {
-    // Use smaller knowledge base by default for Telegram (max 6000 chars)
-    const maxKbLength = platform === 'telegram' ? 6000 : undefined;
+    // Use larger knowledge base for Telegram to include more documents (max 20000 chars)
+    const maxKbLength = platform === 'telegram' ? 20000 : undefined;
     const systemPrompt = generateSystemPrompt(botSettings, platform, maxKbLength);
     
     const completion = await Promise.race([
@@ -315,10 +318,10 @@ export async function processChatMessage(
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 300, // Reduced from 500 for faster generation
+        max_tokens: 1000, // Increased for detailed responses
         temperature: 0.7,
         stream: false,
-        top_p: 0.9, // Slightly reduced for faster sampling
+        top_p: 0.9,
         frequency_penalty: 0,
         presence_penalty: 0,
       }),
@@ -337,8 +340,8 @@ export async function processChatMessage(
       console.warn('⚠️ Timeout with full knowledge base, trying with reduced content...');
       
       try {
-        // Try with minimal knowledge base (max 3000 chars) - FAQs only
-        const reducedPrompt = generateSystemPrompt(botSettings, platform, 3000);
+        // Try with reduced knowledge base (max 10000 chars) if timeout
+        const reducedPrompt = generateSystemPrompt(botSettings, platform, 10000);
         
         const completion = await Promise.race([
           openai.chat.completions.create({
@@ -347,16 +350,16 @@ export async function processChatMessage(
               { role: 'system', content: reducedPrompt },
               { role: 'user', content: message }
             ],
-            max_tokens: 250, // Further reduced for faster generation
+            max_tokens: 800, // Still allow detailed responses
             temperature: 0.7,
             stream: false,
             top_p: 0.9,
             frequency_penalty: 0,
             presence_penalty: 0,
           }),
-          // Shorter timeout for fallback - 15 seconds
+          // Longer timeout for fallback - 25 seconds
           new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('OpenAI API timeout after 15 seconds')), 15000)
+            setTimeout(() => reject(new Error('OpenAI API timeout after 25 seconds')), 25000)
           )
         ]);
 
