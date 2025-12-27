@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { logoutWhatsAppWebClient } from '@/lib/services/whatsappWebService';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,6 +19,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Dynamic import to avoid bundling whatsapp-web.js in Next.js build
+    const { logoutWhatsAppWebClient } = await import('@/lib/services/whatsappWebService');
     const success = await logoutWhatsAppWebClient(botId);
 
     if (success) {

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getQRCode, initializeWhatsAppWebClient } from '@/lib/services/whatsappWebService';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,6 +19,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Dynamic import to avoid bundling whatsapp-web.js in Next.js build
+    const { getQRCode, initializeWhatsAppWebClient, getClientStatus } = await import('@/lib/services/whatsappWebService');
+    
     // Try to get existing QR code
     let qrCode = getQRCode(botId);
 
@@ -38,7 +40,6 @@ export async function GET(request: NextRequest) {
 
     if (!qrCode) {
       // Check if client is already authenticated
-      const { getClientStatus } = await import('@/lib/services/whatsappWebService');
       const status = await getClientStatus(botId);
       if (status.authenticated) {
         return NextResponse.json({
