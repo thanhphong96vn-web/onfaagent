@@ -12,7 +12,7 @@
  *   tsx scripts/discord-worker.ts
  */
 
-import { Client, GatewayIntentBits, Message as DiscordMessage } from 'discord.js';
+import { Client, GatewayIntentBits, Message as DiscordMessage, ChannelType } from 'discord.js';
 import mongoose from 'mongoose';
 import BotSettings from '../lib/models/BotSettings';
 import Message from '../lib/models/Message';
@@ -117,10 +117,15 @@ async function sendMessage(client: Client, channelId: string, message: string): 
       throw new Error(`Channel ${channelId} is not a text channel`);
     }
 
-    await channel.send(message);
-    console.log(`✅ Message sent to ${channelId}`);
+    // Type assertion for sending message
+    if ('send' in channel && typeof (channel as any).send === 'function') {
+      await (channel as any).send(message);
+      console.log(`[DISCORD] ✅ Message sent to channel: ${channelId}`);
+    } else {
+      throw new Error(`Channel ${channelId} does not support sending messages`);
+    }
   } catch (error: any) {
-    console.error(`❌ Error sending message:`, error);
+    console.error(`[DISCORD] ❌ Error sending message to channel ${channelId}:`, error);
     throw error;
   }
 }
@@ -134,12 +139,25 @@ async function handleMessage(client: Client, botSettings: any, msg: DiscordMessa
     return;
   }
 
+  // Debug: Log message details
+  console.log(`[DISCORD] 📨 Message received:`, {
+    channelType: msg.channel.type,
+    channelId: msg.channel.id,
+    isDM: msg.channel.type === 1 || msg.channel.type === 3, // DM or GroupDM
+    author: msg.author.tag,
+    content: msg.content.substring(0, 50),
+    mentions: msg.mentions.has(client.user!),
+    isReply: msg.reference !== null
+  });
+
   // Only handle DMs or mentions in channels
-  const isDM = msg.channel.type === 1; // DMChannel
+  // DM channel types: ChannelType.DM (1) or ChannelType.GroupDM (3)
+  const isDM = msg.channel.type === ChannelType.DM || msg.channel.type === ChannelType.GroupDM;
   const isMentioned = msg.mentions.has(client.user!);
   const isReply = msg.reference !== null;
 
   if (!isDM && !isMentioned && !isReply) {
+    console.log(`[DISCORD] ⏭️ Skipping message: not DM, not mentioned, not reply`);
     return;
   }
 
@@ -147,7 +165,7 @@ async function handleMessage(client: Client, botSettings: any, msg: DiscordMessa
   const channelId = msg.channel.id;
   const userId = msg.author.id;
 
-  console.log(`📨 Discord message: channelId=${channelId}, userId=${userId}, text="${text.substring(0, 50)}..."`);
+  console.log(`[DISCORD] 📨 Processing message: channelId=${channelId}, userId=${userId}, text="${text.substring(0, 50)}..."`);
 
   // Handle welcome message
   const lowerText = text.toLowerCase().trim();
@@ -269,9 +287,17 @@ async function startBot(botId: string) {
 
   client.on('messageCreate', async (message) => {
     try {
+      // Debug: Log all messages received
+      console.log(`[DISCORD] 🔔 messageCreate event triggered:`, {
+        author: message.author.tag,
+        channelType: message.channel.type,
+        content: message.content.substring(0, 50),
+        isBot: message.author.bot
+      });
+      
       await handleMessage(client, botSettings, message);
     } catch (error) {
-      console.error('❌ Error handling Discord message:', error);
+      console.error('[DISCORD] ❌ Error handling Discord message:', error);
     }
   });
 
