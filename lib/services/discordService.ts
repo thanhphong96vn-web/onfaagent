@@ -1,3 +1,5 @@
+'use server';
+
 import { Client, GatewayIntentBits, Message as DiscordMessage, TextChannel, DMChannel, ThreadChannel } from 'discord.js';
 import connectDB from '@/lib/db';
 import BotSettings from '@/lib/models/BotSettings';
