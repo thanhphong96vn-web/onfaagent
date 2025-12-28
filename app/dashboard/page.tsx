@@ -81,6 +81,7 @@ interface BotSettings {
   name: string
   welcomeMessage: string
   themeColor: string
+  webType?: 'web' | 'web-advance'
   faqs: string[]
   documents: DocumentSource[]
   urls: URLSource[]
@@ -135,6 +136,7 @@ export default function DashboardPage() {
     name: '',
     welcomeMessage: 'Xin chào anh chị! mình cần em tư vấn gì ạ?',
     themeColor: '#3B82F6',
+    webType: 'web' as 'web' | 'web-advance',
     faqs: [],
     documents: [],
     urls: [],
@@ -299,6 +301,7 @@ export default function DashboardPage() {
           name: '',
           welcomeMessage: 'Xin chào! Tôi có thể giúp gì cho bạn hôm nay?',
           themeColor: '#3B82F6',
+          webType: 'web',
           faqs: [],
           documents: [],
           urls: [],
@@ -488,7 +491,10 @@ export default function DashboardPage() {
 
   const copyEmbedCode = (botId: string) => {
     const baseUrl = window.location.origin
-    const embedCode = `<script src="${baseUrl}/bot.js" data-bot="${botId}"></script>`
+    const bot = allBots.find(b => b.botId === botId) || selectedBot
+    const webType = bot?.webType || 'web'
+    const scriptFile = webType === 'web-advance' ? 'bot-advance.js' : 'bot.js'
+    const embedCode = `<script src="${baseUrl}/${scriptFile}" data-bot="${botId}"></script>`
     navigator.clipboard.writeText(embedCode)
     setCopiedBotId(botId)
     setTimeout(() => setCopiedBotId(null), 2000)
@@ -497,11 +503,20 @@ export default function DashboardPage() {
   const copyEmbedCodeModal = () => {
     if (selectedBot) {
       const baseUrl = window.location.origin
-      const embedCode = `<script src="${baseUrl}/bot.js" data-bot="${selectedBot.botId}"></script>`
+      const webType = selectedBot.webType || 'web'
+      const scriptFile = webType === 'web-advance' ? 'bot-advance.js' : 'bot.js'
+      const embedCode = `<script src="${baseUrl}/${scriptFile}" data-bot="${selectedBot.botId}"></script>`
       navigator.clipboard.writeText(embedCode)
       setEmbedCodeCopied(true)
       setTimeout(() => setEmbedCodeCopied(false), 3000)
     }
+  }
+
+  const getEmbedCode = (bot: BotSettings) => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://chatai-seven-steel.vercel.app'
+    const webType = bot?.webType || 'web'
+    const scriptFile = webType === 'web-advance' ? 'bot-advance.js' : 'bot.js'
+    return `<script src="${baseUrl}/${scriptFile}" data-bot="${bot.botId}"></script>`
   }
 
   // Document upload function
@@ -1436,6 +1451,23 @@ export default function DashboardPage() {
                           <span className="text-sm text-gray-600">Chọn màu chủ đạo cho bot của bạn</span>
                         </div>
                       </div>
+                      <div>
+                        <Label htmlFor="new-bot-web-type" className="text-sm font-semibold text-gray-700 mb-2 block">Loại Chatbot Web</Label>
+                        <select
+                          id="new-bot-web-type"
+                          value={newBot.webType}
+                          onChange={(e) => setNewBot({...newBot, webType: e.target.value as 'web' | 'web-advance'})}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        >
+                          <option value="web">Web (Modal Popup)</option>
+                          <option value="web-advance">Web Advance (Sidebar)</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {newBot.webType === 'web-advance' 
+                            ? 'Sidebar popup từ bên phải với overlay (giống Binance)' 
+                            : 'Modal popup ở góc dưới bên phải'}
+                        </p>
+                      </div>
                       <div className="flex space-x-3 pt-4 border-t border-gray-200">
                         <Button 
                           onClick={createBot} 
@@ -1604,6 +1636,23 @@ export default function DashboardPage() {
                         onChange={(e) => setSelectedBot({...selectedBot, themeColor: e.target.value})}
                         className="w-full h-12 border border-gray-200 rounded-md"
                       />
+                    </div>
+                    <div>
+                      <Label htmlFor="web-type" className="text-sm font-semibold text-gray-700 mb-2 block">Loại Chatbot Web</Label>
+                      <select
+                        id="web-type"
+                        value={selectedBot.webType || 'web'}
+                        onChange={(e) => setSelectedBot({...selectedBot, webType: e.target.value as 'web' | 'web-advance'})}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="web">Web (Modal Popup)</option>
+                        <option value="web-advance">Web Advance (Sidebar)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {selectedBot.webType === 'web-advance' 
+                          ? 'Sidebar popup từ bên phải với overlay (giống Binance)' 
+                          : 'Modal popup ở góc dưới bên phải'}
+                      </p>
                     </div>
                   </div>
 
@@ -2534,7 +2583,7 @@ export default function DashboardPage() {
                     <Label className="text-sm font-semibold text-gray-700 mb-2 block">Mã nhúng</Label>
                     <div className="flex space-x-3">
                       <Input
-                        value={`<script src="${typeof window !== 'undefined' ? window.location.origin : 'https://chatai-seven-steel.vercel.app'}/bot.js" data-bot="${selectedBot.botId}"></script>`}
+                        value={getEmbedCode(selectedBot)}
                         readOnly
                         className="font-mono text-sm border border-gray-200 rounded-md bg-gray-50"
                       />
@@ -2770,7 +2819,7 @@ export default function DashboardPage() {
                 <Label className="text-sm font-semibold text-gray-700 mb-2 block">Mã nhúng</Label>
                 <div className="flex space-x-3">
                   <Input
-                    value={`<script src="${typeof window !== 'undefined' ? window.location.origin : 'https://chatai-seven-steel.vercel.app'}/bot.js" data-bot="${selectedBot.botId}"></script>`}
+                    value={getEmbedCode(selectedBot)}
                     readOnly
                     className="font-mono text-sm border border-gray-200 rounded-md bg-gray-50"
                   />

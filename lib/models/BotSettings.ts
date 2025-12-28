@@ -72,6 +72,7 @@ export interface IBotSettings extends Document {
   name: string;
   welcomeMessage: string;
   themeColor: string;
+  webType?: 'web' | 'web-advance'; // Type of web chatbot: 'web' (default) or 'web-advance' (sidebar)
   faqs: string[];
   documents: IDocumentSource[];
   urls: IURLSource[];
@@ -110,6 +111,11 @@ const BotSettingsSchema = new Schema<IBotSettings>({
     type: String,
     required: true,
     default: '#3B82F6'
+  },
+  webType: {
+    type: String,
+    enum: ['web', 'web-advance'],
+    default: 'web'
   },
   faqs: [{
     type: String

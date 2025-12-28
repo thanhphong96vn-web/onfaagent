@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { botId, name, welcomeMessage, themeColor, faqs, documents, urls, structuredData, categories } = await request.json();
+    const { botId, name, welcomeMessage, themeColor, webType, faqs, documents, urls, structuredData, categories } = await request.json();
 
     if (!botId || !name) {
       return NextResponse.json(
@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
       name,
       welcomeMessage: welcomeMessage || 'Hello! How can I help you today?',
       themeColor: themeColor || '#3B82F6',
+      webType: webType || 'web',
       faqs: faqs || [],
       documents: documents || [],
       urls: urls || [],
