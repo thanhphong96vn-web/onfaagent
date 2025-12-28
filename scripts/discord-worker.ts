@@ -279,18 +279,21 @@ async function startBot(botId: string) {
     ],
   });
 
-  // Event handlers
+  // Register event handlers BEFORE login to ensure they're active
   client.once('ready', () => {
-    console.log(`✅ Discord bot logged in as: ${client.user?.tag}`);
-    console.log(`   Bot ID: ${client.user?.id}`);
+    console.log(`[DISCORD] ✅ Discord bot logged in as: ${client.user?.tag}`);
+    console.log(`[DISCORD] 🆔 Bot ID: ${client.user?.id}`);
+    console.log(`[DISCORD] ✅ Bot is ready and listening for messages`);
   });
 
+  // Register messageCreate handler BEFORE login
   client.on('messageCreate', async (message) => {
     try {
       // Debug: Log all messages received
       console.log(`[DISCORD] 🔔 messageCreate event triggered:`, {
         author: message.author.tag,
         channelType: message.channel.type,
+        channelId: message.channel.id,
         content: message.content.substring(0, 50),
         isBot: message.author.bot
       });
@@ -302,17 +305,24 @@ async function startBot(botId: string) {
   });
 
   client.on('error', (error) => {
-    console.error('❌ Discord client error:', error);
+    console.error('[DISCORD] ❌ Discord client error:', error);
   });
 
-  // Login
+  client.on('warn', (warning) => {
+    console.warn('[DISCORD] ⚠️ Discord client warning:', warning);
+  });
+
+  // Login AFTER registering all event handlers
   try {
+    console.log(`[DISCORD] 🔐 Logging in with bot token...`);
+    console.log(`[DISCORD] 📋 Registered event handlers: ready, messageCreate, error, warn`);
     await client.login(botSettings.discord.botToken);
     botInstances.set(botId, client);
-    console.log(`✅ Discord bot started successfully for: ${botId}`);
+    console.log(`[DISCORD] ✅ Discord bot started successfully for: ${botId}`);
+    console.log(`[DISCORD] 👂 Bot is now listening for messages...`);
     return client;
   } catch (error: any) {
-    console.error(`❌ Error logging in Discord bot for ${botId}:`, error);
+    console.error(`[DISCORD] ❌ Error logging in Discord bot for ${botId}:`, error);
     return null;
   }
 }
