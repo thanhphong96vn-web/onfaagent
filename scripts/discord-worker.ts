@@ -223,9 +223,15 @@ async function handleMessage(client: Client, botSettings: any, msg: DiscordMessa
     console.log(`[DISCORD] Bot settings check:`);
     console.log(`[DISCORD]   Bot ID: ${botSettings.botId}`);
     console.log(`[DISCORD]   FAQs count: ${botSettings.faqs?.length || 0}`);
-    console.log(`[DISCORD]   Documents count: ${botSettings.documents?.filter((d: any) => d.enabled)?.length || 0}`);
-    console.log(`[DISCORD]   URLs count: ${botSettings.urls?.filter((u: any) => u.enabled)?.length || 0}`);
-    console.log(`[DISCORD]   Structured data count: ${botSettings.structuredData?.filter((s: any) => s.enabled)?.length || 0}`);
+    const totalDocs = botSettings.documents?.length || 0;
+    const enabledDocs = botSettings.documents?.filter((d: any) => d.enabled)?.length || 0;
+    console.log(`[DISCORD]   Documents: ${totalDocs} total, ${enabledDocs} enabled`);
+    const totalUrls = botSettings.urls?.length || 0;
+    const enabledUrls = botSettings.urls?.filter((u: any) => u.enabled)?.length || 0;
+    console.log(`[DISCORD]   URLs: ${totalUrls} total, ${enabledUrls} enabled`);
+    const totalStruct = botSettings.structuredData?.length || 0;
+    const enabledStruct = botSettings.structuredData?.filter((s: any) => s.enabled)?.length || 0;
+    console.log(`[DISCORD]   Structured data: ${totalStruct} total, ${enabledStruct} enabled`);
     
     const reply = await processChatMessage(
       botSettings,
@@ -282,10 +288,17 @@ async function startBot(botId: string) {
     const existingClient = botInstances.get(botId)!;
     if (existingClient.isReady()) {
       console.log(`✅ Discord bot already connected for bot: ${botId}`);
+      // Force reload settings to ensure we have latest data
+      console.log(`[DISCORD] 🔄 Force reloading bot settings for: ${botId}`);
+      botSettingsCache.delete(`discord_${botId}`);
+      await getBotSettings(botId);
       return existingClient;
     }
   }
 
+  // Clear cache before loading to ensure fresh data
+  botSettingsCache.delete(`discord_${botId}`);
+  
   const botSettings = await getBotSettings(botId);
   if (!botSettings) {
     console.error(`❌ Bot settings not found for bot: ${botId}`);
