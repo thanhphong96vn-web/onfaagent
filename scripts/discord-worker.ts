@@ -34,7 +34,7 @@ if (!OPENAI_API_KEY) {
 
 // Cache for bot settings
 const botSettingsCache = new Map<string, { settings: any; timestamp: number }>();
-const BOT_SETTINGS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const BOT_SETTINGS_CACHE_TTL = 30 * 1000; // 30 seconds (reduced for faster updates)
 
 // Alias for worker cache (same as botSettingsCache)
 const workerBotSettings = botSettingsCache;
@@ -98,8 +98,31 @@ async function getBotSettings(botId: string): Promise<any | null> {
   }).select('botId name userId discord welcomeMessage faqs documents urls structuredData updatedAt').lean() as any;
 
   if (botSettings) {
+    // Ensure documents, urls, structuredData are always arrays
+    if (!Array.isArray(botSettings.documents)) {
+      botSettings.documents = [];
+    }
+    if (!Array.isArray(botSettings.urls)) {
+      botSettings.urls = [];
+    }
+    if (!Array.isArray(botSettings.structuredData)) {
+      botSettings.structuredData = [];
+    }
+    if (!Array.isArray(botSettings.faqs)) {
+      botSettings.faqs = [];
+    }
+    
     botSettingsCache.set(cacheKey, { settings: botSettings, timestamp: Date.now() });
-    console.log(`✅ Loaded bot settings from DB for: ${botId} (${botSettings.documents?.length || 0} documents)`);
+    
+    const docCount = botSettings.documents?.length || 0;
+    const enabledDocCount = botSettings.documents?.filter((d: any) => d.enabled)?.length || 0;
+    const urlCount = botSettings.urls?.length || 0;
+    const structCount = botSettings.structuredData?.length || 0;
+    
+    console.log(`✅ Loaded bot settings from DB for: ${botId}`);
+    console.log(`   Documents: ${docCount} total, ${enabledDocCount} enabled`);
+    console.log(`   URLs: ${urlCount}, Structured Data: ${structCount}`);
+    console.log(`   Updated at: ${botSettings.updatedAt}`);
   }
 
   return botSettings;
