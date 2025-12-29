@@ -329,7 +329,8 @@ async function startBot(botId: string) {
   });
 
   // Register messageCreate handler BEFORE login
-  console.log(`[DISCORD] 📝 Registering messageCreate event handler...`);
+  // Use botId from closure instead of botSettings to load fresh settings each time
+  console.log(`[DISCORD] 📝 Registering messageCreate event handler for botId: ${botId}...`);
   client.on('messageCreate', async (message) => {
     try {
       // Debug: Log ALL messages received (even from bots to verify events work)
@@ -349,7 +350,13 @@ async function startBot(botId: string) {
       
       // Only process non-bot messages
       if (!message.author.bot) {
-        await handleMessage(client, botSettings, message);
+        // Load fresh bot settings for this botId
+        const freshBotSettings = await getBotSettings(botId);
+        if (!freshBotSettings) {
+          console.error(`[DISCORD] ❌ Bot settings not found for botId: ${botId}`);
+          return;
+        }
+        await handleMessage(client, freshBotSettings, message);
       } else {
         console.log(`[DISCORD] ⏭️ Skipping bot message from: ${message.author.tag}`);
       }
@@ -358,7 +365,7 @@ async function startBot(botId: string) {
       console.error('[DISCORD] ❌ Error stack:', error instanceof Error ? error.stack : String(error));
     }
   });
-  console.log(`[DISCORD] ✅ messageCreate event handler registered`);
+  console.log(`[DISCORD] ✅ messageCreate event handler registered for botId: ${botId}`);
   
   // Add debug logging for other events to verify bot is receiving events
   // These events don't require MESSAGE CONTENT INTENT, so if we see these but not messageCreate,
