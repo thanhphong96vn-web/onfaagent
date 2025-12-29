@@ -329,6 +329,7 @@ async function startBot(botId: string) {
   });
 
   // Register messageCreate handler BEFORE login
+  console.log(`[DISCORD] 📝 Registering messageCreate event handler...`);
   client.on('messageCreate', async (message) => {
     try {
       // Debug: Log ALL messages received (even from bots to verify events work)
@@ -357,6 +358,7 @@ async function startBot(botId: string) {
       console.error('[DISCORD] ❌ Error stack:', error instanceof Error ? error.stack : String(error));
     }
   });
+  console.log(`[DISCORD] ✅ messageCreate event handler registered`);
   
   // Add debug logging for other events to verify bot is receiving events
   // These events don't require MESSAGE CONTENT INTENT, so if we see these but not messageCreate,
@@ -376,8 +378,17 @@ async function startBot(botId: string) {
     if (event.t === 'MESSAGE_CREATE' || event.t === 'TYPING_START') {
       console.log(`[DISCORD] 📡 Raw event received: ${event.t}`, {
         type: event.t,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        hasData: !!event.d,
+        dataKeys: event.d ? Object.keys(event.d) : []
       });
+      
+      // If we receive MESSAGE_CREATE but messageCreate handler doesn't fire,
+      // it means MESSAGE CONTENT INTENT is not enabled
+      if (event.t === 'MESSAGE_CREATE') {
+        console.log(`[DISCORD] ⚠️ Raw MESSAGE_CREATE received but messageCreate handler may not fire if MESSAGE CONTENT INTENT is disabled`);
+        console.log(`[DISCORD] ⚠️ Check Discord Developer Portal → Bot → Privileged Gateway Intents → MESSAGE CONTENT INTENT`);
+      }
     }
   });
 
