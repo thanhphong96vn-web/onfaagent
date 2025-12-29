@@ -387,14 +387,34 @@ async function startBot(botId: string) {
         type: event.t,
         timestamp: new Date().toISOString(),
         hasData: !!event.d,
-        dataKeys: event.d ? Object.keys(event.d) : []
+        dataKeys: event.d ? Object.keys(event.d) : [],
+        hasContent: event.d?.content ? true : false,
+        contentLength: event.d?.content?.length || 0
       });
       
       // If we receive MESSAGE_CREATE but messageCreate handler doesn't fire,
-      // it means MESSAGE CONTENT INTENT is not enabled
+      // it means MESSAGE CONTENT INTENT is not enabled or there's a parsing issue
       if (event.t === 'MESSAGE_CREATE') {
-        console.log(`[DISCORD] ⚠️ Raw MESSAGE_CREATE received but messageCreate handler may not fire if MESSAGE CONTENT INTENT is disabled`);
+        console.log(`[DISCORD] ⚠️ Raw MESSAGE_CREATE received - checking if messageCreate handler will fire...`);
+        console.log(`[DISCORD] ⚠️ If you don't see "🔔🔔🔔 messageCreate event triggered!" next, MESSAGE CONTENT INTENT may not be enabled`);
         console.log(`[DISCORD] ⚠️ Check Discord Developer Portal → Bot → Privileged Gateway Intents → MESSAGE CONTENT INTENT`);
+        
+        // Log message author info from raw event
+        if (event.d?.author) {
+          console.log(`[DISCORD] 📡 Raw message author:`, {
+            id: event.d.author.id,
+            username: event.d.author.username,
+            bot: event.d.author.bot
+          });
+        }
+        
+        // Check if content is present in raw event
+        if (!event.d?.content) {
+          console.log(`[DISCORD] ⚠️ Raw MESSAGE_CREATE has NO content field - this confirms MESSAGE CONTENT INTENT is NOT enabled!`);
+          console.log(`[DISCORD] ⚠️ You MUST enable MESSAGE CONTENT INTENT in Discord Developer Portal and RE-INVITE the bot!`);
+        } else {
+          console.log(`[DISCORD] ✅ Raw MESSAGE_CREATE has content field - MESSAGE CONTENT INTENT appears to be enabled`);
+        }
       }
     }
   });
