@@ -46,7 +46,7 @@ export function formatTelegramMessage(text: string): string {
         // Format with bullet emoji
         processedLines.push(`• ${escapeHtml(bulletMatch[1])}`);
       } else {
-        // Regular line - process markdown formatting
+        // Regular line - convert markdown formatting first, then escape HTML
         let processedLine = line;
         
         // Convert markdown bold **text** to HTML <b>text</b>
@@ -54,26 +54,31 @@ export function formatTelegramMessage(text: string): string {
           return `<b>${escapeHtml(content)}</b>`;
         });
         
-        // Convert markdown italic *text* to HTML <i>text</i> (but not if it's part of **)
-        processedLine = processedLine.replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, (match, content) => {
-          return `<i>${escapeHtml(content)}</i>`;
-        });
-        
         // Convert markdown code `code` to HTML <code>code</code>
         processedLine = processedLine.replace(/`([^`]+)`/g, (match, content) => {
           return `<code>${escapeHtml(content)}</code>`;
         });
         
-        // Convert markdown underline __text__ to HTML <u>text</u>
+        // Convert markdown underline __text__ to HTML <u>text</u> (only if not already bold)
         processedLine = processedLine.replace(/__(.*?)__/g, (match, content) => {
+          // Skip if already inside <b> tag
+          if (match.includes('<b>')) return match;
           return `<u>${escapeHtml(content)}</u>`;
         });
         
-        // Escape any remaining HTML characters that weren't converted
-        // But preserve our HTML tags
-        processedLine = processedLine.replace(/&(?!amp;|lt;|gt;|quot;|#\d+;)/g, '&amp;');
-        processedLine = processedLine.replace(/<(?![biu]|code|pre|a\s|/)/g, '&lt;');
-        processedLine = processedLine.replace(/(?<!<\/[biu]|<\/code|<\/pre|<\/a)>/g, '&gt;');
+        // Escape any remaining HTML characters (< > &) that aren't part of our HTML tags
+        // Simple approach: escape all, then restore our tags
+        processedLine = processedLine
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          // Restore our HTML tags
+          .replace(/&lt;b&gt;/g, '<b>')
+          .replace(/&lt;\/b&gt;/g, '</b>')
+          .replace(/&lt;u&gt;/g, '<u>')
+          .replace(/&lt;\/u&gt;/g, '</u>')
+          .replace(/&lt;code&gt;/g, '<code>')
+          .replace(/&lt;\/code&gt;/g, '</code>');
         
         processedLines.push(processedLine);
       }
