@@ -136,25 +136,39 @@ async function getBotSettings(botId: string): Promise<any | null> {
  */
 async function sendMessage(client: Client, channelId: string, message: string): Promise<void> {
   try {
+    console.log(`[DISCORD] 📤 Attempting to send message to channel: ${channelId}`);
+    console.log(`[DISCORD] 📤 Message length: ${message.length} chars`);
+    console.log(`[DISCORD] 📤 Message preview: ${message.substring(0, 100)}...`);
+    
     const channel = await client.channels.fetch(channelId);
     
     if (!channel) {
       throw new Error(`Channel ${channelId} not found`);
     }
 
+    console.log(`[DISCORD] 📤 Channel fetched: ${channel.type} (${ChannelType[channel.type] || 'Unknown'})`);
+
     if (!channel.isTextBased()) {
-      throw new Error(`Channel ${channelId} is not a text channel`);
+      throw new Error(`Channel ${channelId} is not a text channel (type: ${channel.type})`);
     }
 
     // Type assertion for sending message
     if ('send' in channel && typeof (channel as any).send === 'function') {
-      await (channel as any).send(message);
-      console.log(`[DISCORD] ✅ Message sent to channel: ${channelId}`);
+      console.log(`[DISCORD] 📤 Sending message...`);
+      const sentMessage = await (channel as any).send(message);
+      console.log(`[DISCORD] ✅ Message sent successfully to channel: ${channelId}`);
+      console.log(`[DISCORD] ✅ Sent message ID: ${sentMessage?.id || 'N/A'}`);
     } else {
       throw new Error(`Channel ${channelId} does not support sending messages`);
     }
   } catch (error: any) {
     console.error(`[DISCORD] ❌ Error sending message to channel ${channelId}:`, error);
+    console.error(`[DISCORD] ❌ Error details:`, {
+      message: error.message,
+      code: error.code,
+      statusCode: error.statusCode,
+      stack: error.stack
+    });
     throw error;
   }
 }
@@ -163,13 +177,20 @@ async function sendMessage(client: Client, channelId: string, message: string): 
  * Handle incoming message
  */
 async function handleMessage(client: Client, botSettings: any, msg: DiscordMessage) {
-  // Ignore bot messages
+  // Ignore bot messages (including self)
   if (msg.author.bot) {
+    console.log(`[DISCORD] ⏭️ Skipping bot message in handleMessage: ${msg.author.tag} (bot: ${msg.author.bot})`);
+    return;
+  }
+  
+  // Ignore messages from the bot itself
+  if (msg.author.id === client.user?.id) {
+    console.log(`[DISCORD] ⏭️ Skipping self message: ${msg.author.tag} (${msg.author.id})`);
     return;
   }
 
   // Debug: Log message details
-  console.log(`[DISCORD] 📨 Message received:`, {
+  console.log(`[DISCORD] 📨 Message received in handleMessage:`, {
     channelType: msg.channel.type,
     channelTypeName: ChannelType[msg.channel.type] || `Unknown(${msg.channel.type})`,
     channelId: msg.channel.id,
@@ -177,9 +198,11 @@ async function handleMessage(client: Client, botSettings: any, msg: DiscordMessa
     author: msg.author.tag,
     authorId: msg.author.id,
     content: msg.content.substring(0, 50),
+    contentFull: msg.content,
     mentions: msg.mentions.has(client.user!),
     isReply: msg.reference !== null,
-    clientUserId: client.user?.id
+    clientUserId: client.user?.id,
+    botSettingsId: botSettings?.botId
   });
 
   // Only handle DMs or mentions in channels
@@ -389,19 +412,31 @@ async function startBot(botId: string) {
       
       // Only process non-bot messages
       if (!message.author.bot) {
+        console.log(`[DISCORD] ✅ Processing non-bot message from: ${message.author.tag}`);
+        
         // Load fresh bot settings for this botId
+        console.log(`[DISCORD] 📥 Loading bot settings for botId: ${botId}...`);
         const freshBotSettings = await getBotSettings(botId);
         if (!freshBotSettings) {
           console.error(`[DISCORD] ❌ Bot settings not found for botId: ${botId}`);
           return;
         }
+        console.log(`[DISCORD] ✅ Bot settings loaded: ${freshBotSettings.name} (${freshBotSettings.botId})`);
+        
+        console.log(`[DISCORD] 📤 Calling handleMessage...`);
         await handleMessage(client, freshBotSettings, message);
+        console.log(`[DISCORD] ✅ handleMessage completed`);
       } else {
         console.log(`[DISCORD] ⏭️ Skipping bot message from: ${message.author.tag}`);
       }
     } catch (error) {
       console.error('[DISCORD] ❌ Error handling Discord message:', error);
       console.error('[DISCORD] ❌ Error stack:', error instanceof Error ? error.stack : String(error));
+      console.error('[DISCORD] ❌ Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        name: error instanceof Error ? error.name : 'Unknown',
+        cause: error instanceof Error ? error.cause : undefined
+      });
     }
   });
   console.log(`[DISCORD] ✅ messageCreate event handler registered for botId: ${botId}`);
