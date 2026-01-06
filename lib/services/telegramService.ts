@@ -450,6 +450,7 @@ export async function handleTelegramMessage(update: TelegramBot.Update, botId?: 
         );
         clearInterval(typingInterval);
         console.log(`✅ AI reply generated: "${reply.substring(0, 50)}..."`);
+        
       } catch (aiError: any) {
         clearInterval(typingInterval);
         console.error('❌ AI processing error:', aiError);
@@ -473,12 +474,16 @@ export async function handleTelegramMessage(update: TelegramBot.Update, botId?: 
         return; // Exit early
       }
 
+      // Format reply for Telegram HTML - convert markdown to HTML
+      const { formatTelegramMessage } = await import('@/lib/utils/telegramFormatter');
+      const formattedReply = formatTelegramMessage(reply);
+      
       // Send reply with retry logic
       try {
         await sendTelegramMessage(
           botSettings.telegram.botToken,
           chatId,
-          reply
+          formattedReply
         );
         console.log('✅ Reply sent to Telegram');
       } catch (sendError: any) {

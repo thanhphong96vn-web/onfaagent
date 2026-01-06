@@ -277,10 +277,14 @@ async function handleMessage(bot: TelegramBot, botSettings: any, message: Telegr
     clearInterval(typingInterval);
     console.log(`✅ [TELEGRAM] AI reply generated (${reply.length} chars): "${reply.substring(0, 100)}..."`);
 
+    // Format reply for Telegram HTML
+    const { formatTelegramMessage } = await import('../lib/utils/telegramFormatter');
+    const formattedReply = formatTelegramMessage(reply);
+
     // Send reply with retry
     console.log(`📤 [TELEGRAM] [${new Date().toISOString()}] Attempting to send reply (${reply.length} chars) to chatId: ${chatId}`);
     try {
-      const sentMessage = await sendMessage(bot, chatId, reply);
+      const sentMessage = await sendMessage(bot, chatId, formattedReply);
       console.log(`✅ [TELEGRAM] [${new Date().toISOString()}] Reply sent successfully! Message ID: ${sentMessage.message_id}, chatId: ${chatId}`);
     } catch (sendError: any) {
       console.error(`❌ [TELEGRAM] [${new Date().toISOString()}] Error sending reply to chatId ${chatId}:`, sendError);
