@@ -643,7 +643,7 @@ async function main() {
       }
     }
 
-    // Refresh bot list every 15 seconds (reduced for faster updates)
+    // Refresh bot list every 30 seconds (increased to reduce restart frequency)
     setInterval(async () => {
       try {
         console.log(`[DISCORD] 🔄 Refreshing bot list and checking for updates...`);
@@ -654,6 +654,14 @@ async function main() {
         }).select('botId name updatedAt').lean() as any[];
 
         const enabledBotIds = enabledBots.map(b => b.botId);
+        
+        // Pre-load settings for all enabled bots to populate cache
+        for (const bot of enabledBots) {
+          if (!workerBotSettings.has(bot.botId)) {
+            console.log(`[DISCORD] 📥 Pre-loading settings for ${bot.botId}...`);
+            await getBotSettings(bot.botId);
+          }
+        }
 
         // Start new bots or reload if settings changed
         for (const bot of enabledBots) {
@@ -672,9 +680,19 @@ async function main() {
             // Check if bot settings were updated
             const cached = workerBotSettings.get(bot.botId);
             const dbUpdatedAt = new Date(bot.updatedAt).getTime();
-            const cacheUpdatedAt = cached?.settings?.updatedAt ? new Date(cached.settings.updatedAt).getTime() : 0;
             
-            if (dbUpdatedAt > cacheUpdatedAt) {
+            // If cache doesn't exist or doesn't have settings, load it first (don't restart)
+            if (!cached || !cached.settings) {
+              console.log(`[DISCORD] 📥 Cache not found for ${bot.botId}, loading settings...`);
+              await getBotSettings(bot.botId);
+              continue;
+            }
+            
+            const cacheUpdatedAt = cached.settings?.updatedAt ? new Date(cached.settings.updatedAt).getTime() : 0;
+            
+            // Only restart if cache exists and settings actually changed
+            // Skip if cacheUpdatedAt is 0 (epoch time) - means cache was just cleared
+            if (cacheUpdatedAt > 0 && dbUpdatedAt > cacheUpdatedAt) {
               // Check if bot is rate limited before restarting
               const rateLimitInfo = rateLimitErrors.get(bot.botId);
               if (rateLimitInfo && rateLimitInfo.resetAt > new Date()) {
@@ -683,11 +701,11 @@ async function main() {
                 continue;
               }
               
-              // Only restart if settings changed significantly (more than 5 seconds ago)
+              // Only restart if settings changed significantly (more than 10 seconds ago)
               // This prevents restarting while processing messages
               const timeDiff = dbUpdatedAt - cacheUpdatedAt;
-              if (timeDiff < 5000) {
-                console.log(`[DISCORD] ⏳ Settings updated too recently (${timeDiff}ms ago), skipping restart to avoid interrupting message processing`);
+              if (timeDiff < 10000) {
+                console.log(`[DISCORD] ⏳ Settings updated too recently (${Math.round(timeDiff / 1000)}s ago), skipping restart to avoid interrupting message processing`);
                 continue;
               }
               
