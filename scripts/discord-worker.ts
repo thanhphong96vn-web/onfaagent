@@ -48,6 +48,11 @@ const rateLimitErrors = new Map<string, { resetAt: Date; retryCount: number }>()
 // Track bots that are currently processing messages (to prevent restart)
 const processingMessages = new Set<string>();
 
+// Track processed messages to prevent duplicate responses
+// Key: `${messageId}_${channelId}`, Value: timestamp
+const processedMessages = new Map<string, number>();
+const PROCESSED_MESSAGES_TTL = 60000; // 60 seconds - messages older than this can be reprocessed (for debugging)
+
 /**
  * Connect to MongoDB
  */
@@ -422,6 +427,14 @@ async function startBot(botId: string) {
         return;
       }
       
+      // Check if message was already processed (prevent duplicate responses)
+      const messageKey = `${message.id}_${message.channel.id}`;
+      const processedTime = processedMessages.get(messageKey);
+      if (processedTime && Date.now() - processedTime < PROCESSED_MESSAGES_TTL) {
+        console.log(`[DISCORD] ⏭️ Message ${message.id} already processed ${Math.round((Date.now() - processedTime) / 1000)}s ago, skipping duplicate`);
+        return;
+      }
+      
       // Debug: Log ALL messages received (even from bots to verify events work)
       console.log(`[DISCORD] 📨 Message details:`, {
         author: message.author.tag,
@@ -430,6 +443,7 @@ async function startBot(botId: string) {
         channelType: message.channel.type,
         channelTypeName: ChannelType[message.channel.type] || `Unknown(${message.channel.type})`,
         channelId: message.channel.id,
+        messageId: message.id,
         content: message.content || '(empty)',
         contentLength: message.content?.length || 0,
         guildId: message.guildId || 'DM',
@@ -441,11 +455,25 @@ async function startBot(botId: string) {
       if (!message.author.bot) {
         console.log(`[DISCORD] ✅ Processing non-bot message from: ${message.author.tag}`);
         
+        // Mark message as being processed NOW (before async operations)
+        processedMessages.set(messageKey, Date.now());
+        
+        // Clean up old processed messages (keep map size manageable)
+        if (processedMessages.size > 1000) {
+          const now = Date.now();
+          for (const [key, timestamp] of processedMessages.entries()) {
+            if (now - timestamp > PROCESSED_MESSAGES_TTL) {
+              processedMessages.delete(key);
+            }
+          }
+        }
+        
         // Load fresh bot settings for this botId
         console.log(`[DISCORD] 📥 Loading bot settings for botId: ${botId}...`);
         const freshBotSettings = await getBotSettings(botId);
         if (!freshBotSettings) {
           console.error(`[DISCORD] ❌ Bot settings not found for botId: ${botId}`);
+          processedMessages.delete(messageKey); // Remove from processed if failed
           return;
         }
         console.log(`[DISCORD] ✅ Bot settings loaded: ${freshBotSettings.name} (${freshBotSettings.botId})`);
@@ -531,7 +559,8 @@ async function startBot(botId: string) {
         } else {
           console.log(`[DISCORD] ✅ Raw MESSAGE_CREATE has content field - MESSAGE CONTENT INTENT appears to be enabled`);
           
-          // FALLBACK: If handler doesn't fire after 1 second, manually process the message
+          // FALLBACK: If handler doesn't fire after 2 seconds, manually process the message
+          // BUT only if message hasn't been processed yet
           setTimeout(async () => {
             const listenerCount = client.listenerCount('messageCreate');
             console.log(`[DISCORD] 🔍 Checking if messageCreate handler was triggered... (${listenerCount} listeners)`);
@@ -542,11 +571,23 @@ async function startBot(botId: string) {
               const messageId = event.d.id;
               
               if (channelId && messageId && client.isReady()) {
+                // Check if message was already processed
+                const messageKey = `${messageId}_${channelId}`;
+                const processedTime = processedMessages.get(messageKey);
+                if (processedTime && Date.now() - processedTime < PROCESSED_MESSAGES_TTL) {
+                  console.log(`[DISCORD] ⏭️ FALLBACK: Message ${messageId} already processed ${Math.round((Date.now() - processedTime) / 1000)}s ago, skipping duplicate`);
+                  return;
+                }
+                
                 const channel = await client.channels.fetch(channelId).catch(() => null);
                 if (channel && channel.isTextBased()) {
                   const message = await (channel as any).messages.fetch(messageId).catch(() => null);
                   if (message && !message.author.bot) {
-                    console.log(`[DISCORD] 🔄 FALLBACK: Manually processing message from raw event`);
+                    console.log(`[DISCORD] 🔄 FALLBACK: Manually processing message from raw event (messageCreate handler may not have fired)`);
+                    
+                    // Mark message as being processed NOW
+                    processedMessages.set(messageKey, Date.now());
+                    
                     const freshBotSettings = await getBotSettings(botId);
                     if (freshBotSettings) {
                       await handleMessage(client, freshBotSettings, message);
