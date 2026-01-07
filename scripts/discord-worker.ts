@@ -395,6 +395,12 @@ async function startBot(botId: string) {
   console.log(`[DISCORD] 📝 Registering messageCreate event handler for botId: ${botId}...`);
   client.on('messageCreate', async (message) => {
     try {
+      // Check if bot is ready before processing
+      if (!client.isReady()) {
+        console.log(`[DISCORD] ⏳ Bot not ready yet, skipping message from ${message.author.tag}`);
+        return;
+      }
+      
       // Debug: Log ALL messages received (even from bots to verify events work)
       console.log(`[DISCORD] 🔔🔔🔔 messageCreate event triggered! 🔔🔔🔔`);
       console.log(`[DISCORD] 📨 Message details:`, {
@@ -407,7 +413,8 @@ async function startBot(botId: string) {
         content: message.content || '(empty)',
         contentLength: message.content?.length || 0,
         guildId: message.guildId || 'DM',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        botReady: client.isReady()
       });
       
       // Only process non-bot messages
@@ -676,6 +683,14 @@ async function main() {
                 continue;
               }
               
+              // Only restart if settings changed significantly (more than 5 seconds ago)
+              // This prevents restarting while processing messages
+              const timeDiff = dbUpdatedAt - cacheUpdatedAt;
+              if (timeDiff < 5000) {
+                console.log(`[DISCORD] ⏳ Settings updated too recently (${timeDiff}ms ago), skipping restart to avoid interrupting message processing`);
+                continue;
+              }
+              
               console.log(`[DISCORD] 🔄 Bot settings updated for ${bot.botId}, reloading...`);
               console.log(`[DISCORD]    Cache: ${new Date(cacheUpdatedAt).toISOString()}, DB: ${new Date(dbUpdatedAt).toISOString()}`);
               
@@ -694,8 +709,8 @@ async function main() {
                     console.error(`[DISCORD] ⚠️ Error destroying client:`, destroyError);
                   }
                   botInstances.delete(bot.botId);
-                  // Add small delay before restarting to avoid immediate retry
-                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  // Add delay before restarting to avoid immediate retry
+                  await new Promise(resolve => setTimeout(resolve, 3000));
                   await startBot(bot.botId);
                 } else {
                   console.log(`[DISCORD] ⏳ Bot ${bot.botId} is not ready yet, skipping restart`);
