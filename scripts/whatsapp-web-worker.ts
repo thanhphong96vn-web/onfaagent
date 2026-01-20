@@ -110,6 +110,8 @@ async function getBotSettings(botId: string): Promise<any | null> {
 async function sendMessage(client: Client, to: string, message: string): Promise<void> {
   // Handle both @c.us and @lid formats
   let chatId: string;
+  const isLidChat = to.includes('@lid');
+  
   if (to.includes('@')) {
     // Already has format like 84922156755@c.us or 206206329217189@lid
     chatId = to;
@@ -119,18 +121,21 @@ async function sendMessage(client: Client, to: string, message: string): Promise
     chatId = `${phoneNumber}@c.us`;
   }
   
-  const maxRetries = 2;
+  const maxRetries = isLidChat ? 3 : 2; // More retries for @lid chats
   let lastError: any = null;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Ensure chat exists and is loaded before sending to avoid sendSeen errors
-      try {
-        await client.getChatById(chatId);
-      } catch (chatError) {
-        // Chat might not exist yet - this is okay, we'll try to send anyway
-        if (attempt === 1) {
-          console.log(`⚠️ Chat ${chatId} not found, will attempt to send anyway...`);
+      // For @lid chats, skip getChatById check as it may not work reliably
+      // For @c.us chats, try to ensure chat is loaded
+      if (!isLidChat) {
+        try {
+          await client.getChatById(chatId);
+        } catch (chatError) {
+          // Chat might not exist yet - this is okay, we'll try to send anyway
+          if (attempt === 1) {
+            console.log(`⚠️ Chat ${chatId} not found, will attempt to send anyway...`);
+          }
         }
       }
       
@@ -148,14 +153,33 @@ async function sendMessage(client: Client, to: string, message: string): Promise
       
       if (isSendSeenError && attempt < maxRetries) {
         console.warn(`⚠️ sendSeen error for ${chatId} (attempt ${attempt}/${maxRetries}), retrying...`);
-        // Wait before retrying to let WhatsApp state settle
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        // Wait longer for @lid chats, shorter for @c.us chats
+        const waitTime = isLidChat ? 2000 * attempt : 1000 * attempt;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         continue; // Retry
       } else if (isSendSeenError) {
         // Last attempt failed with sendSeen error
-        // The message might have been sent despite the error
-        console.warn(`⚠️ sendSeen error persisted for ${chatId} after ${maxRetries} attempts`);
-        console.warn(`⚠️ Message may have been sent successfully despite the error`);
+        // For @lid chats, this is often a false error - message was likely sent
+        // Try to verify by checking if we can get the chat (optional verification)
+        if (isLidChat) {
+          try {
+            // Small delay to let WhatsApp process
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const chat = await client.getChatById(chatId).catch(() => null);
+            if (chat) {
+              console.log(`✅ Message likely sent successfully to ${chatId} (verified chat exists)`);
+            } else {
+              console.warn(`⚠️ sendSeen error persisted for ${chatId} after ${maxRetries} attempts`);
+              console.warn(`⚠️ Message may have been sent successfully despite the error`);
+            }
+          } catch (verifyError) {
+            console.warn(`⚠️ sendSeen error persisted for ${chatId} after ${maxRetries} attempts`);
+            console.warn(`⚠️ Message may have been sent successfully despite the error`);
+          }
+        } else {
+          console.warn(`⚠️ sendSeen error persisted for ${chatId} after ${maxRetries} attempts`);
+          console.warn(`⚠️ Message may have been sent successfully despite the error`);
+        }
         // Don't throw - treat as success since message was likely sent
         return;
       }
