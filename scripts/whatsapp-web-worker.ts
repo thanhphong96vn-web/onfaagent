@@ -105,7 +105,7 @@ async function getBotSettings(botId: string): Promise<any | null> {
 
 /**
  * Send message via WhatsApp Web
- * Handles sendSeen errors gracefully by retrying
+ * Handles sendSeen errors gracefully by retrying and verifying delivery
  */
 async function sendMessage(client: Client, to: string, message: string): Promise<void> {
   // Handle both @c.us and @lid formats
@@ -126,22 +126,32 @@ async function sendMessage(client: Client, to: string, message: string): Promise
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // For @lid chats, skip getChatById check as it may not work reliably
-      // For @c.us chats, try to ensure chat is loaded
-      if (!isLidChat) {
-        try {
-          await client.getChatById(chatId);
-        } catch (chatError) {
-          // Chat might not exist yet - this is okay, we'll try to send anyway
-          if (attempt === 1) {
-            console.log(`⚠️ Chat ${chatId} not found, will attempt to send anyway...`);
-          }
+      // Always get the chat first - this ensures it's loaded
+      let chat;
+      try {
+        chat = await client.getChatById(chatId);
+      } catch (chatError) {
+        // If chat doesn't exist, wait and retry
+        if (attempt < maxRetries) {
+          console.warn(`⚠️ Chat ${chatId} not found (attempt ${attempt}/${maxRetries}), retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          continue;
+        } else {
+          throw new Error(`Chat ${chatId} not found after ${maxRetries} attempts`);
         }
       }
       
-      await client.sendMessage(chatId, message);
-      console.log(`✅ Message sent to ${chatId}`);
-      return; // Success, exit function
+      // Use chat.sendMessage() instead of client.sendMessage() for more reliability
+      // This ensures we're sending to a loaded chat object
+      const sentMessage = await chat.sendMessage(message);
+      
+      // Verify message was actually sent by checking for message ID
+      if (sentMessage && sentMessage.id) {
+        console.log(`✅ Message sent to ${chatId} (ID: ${sentMessage.id._serialized || sentMessage.id})`);
+        return; // Success, exit function
+      } else {
+        throw new Error('Message sent but no message ID returned');
+      }
     } catch (error: any) {
       lastError = error;
       
@@ -157,36 +167,31 @@ async function sendMessage(client: Client, to: string, message: string): Promise
         const waitTime = isLidChat ? 2000 * attempt : 1000 * attempt;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue; // Retry
-      } else if (isSendSeenError) {
-        // Last attempt failed with sendSeen error
-        // For @lid chats, this is often a false error - message was likely sent
-        // Try to verify by checking if we can get the chat (optional verification)
-        if (isLidChat) {
-          try {
-            // Small delay to let WhatsApp process
-            await new Promise(resolve => setTimeout(resolve, 500));
-            const chat = await client.getChatById(chatId).catch(() => null);
-            if (chat) {
-              console.log(`✅ Message likely sent successfully to ${chatId} (verified chat exists)`);
-            } else {
-              console.warn(`⚠️ sendSeen error persisted for ${chatId} after ${maxRetries} attempts`);
-              console.warn(`⚠️ Message may have been sent successfully despite the error`);
-            }
-          } catch (verifyError) {
-            console.warn(`⚠️ sendSeen error persisted for ${chatId} after ${maxRetries} attempts`);
-            console.warn(`⚠️ Message may have been sent successfully despite the error`);
-          }
-        } else {
-          console.warn(`⚠️ sendSeen error persisted for ${chatId} after ${maxRetries} attempts`);
-          console.warn(`⚠️ Message may have been sent successfully despite the error`);
-        }
-        // Don't throw - treat as success since message was likely sent
-        return;
       }
       
-      // For other errors, throw immediately
-      console.error(`❌ Error sending message to ${chatId}:`, error);
-      throw error;
+      // For sendSeen errors on last attempt, try one more time with client.sendMessage as fallback
+      if (isSendSeenError && attempt === maxRetries) {
+        console.warn(`⚠️ sendSeen error persisted, trying fallback method...`);
+        try {
+          // Fallback: try client.sendMessage directly (might work even if chat.sendMessage fails)
+          const fallbackMessage = await client.sendMessage(chatId, message);
+          if (fallbackMessage && fallbackMessage.id) {
+            console.log(`✅ Message sent via fallback method to ${chatId}`);
+            return;
+          }
+        } catch (fallbackError) {
+          console.error(`❌ Fallback method also failed:`, fallbackError);
+        }
+      }
+      
+      // For other errors or if all retries failed, throw
+      if (attempt === maxRetries) {
+        console.error(`❌ Error sending message to ${chatId} after ${maxRetries} attempts:`, error);
+        throw error;
+      }
+      
+      // Wait before retrying for non-sendSeen errors
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
     }
   }
   
