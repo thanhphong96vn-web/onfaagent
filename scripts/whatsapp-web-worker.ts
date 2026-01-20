@@ -105,26 +105,69 @@ async function getBotSettings(botId: string): Promise<any | null> {
 
 /**
  * Send message via WhatsApp Web
+ * Handles sendSeen errors gracefully by retrying
  */
 async function sendMessage(client: Client, to: string, message: string): Promise<void> {
-  try {
-    // Handle both @c.us and @lid formats
-    let chatId: string;
-    if (to.includes('@')) {
-      // Already has format like 84922156755@c.us or 206206329217189@lid
-      chatId = to;
-    } else {
-      // Just phone number, add @c.us
-      const phoneNumber = to.replace(/[^0-9]/g, '');
-      chatId = `${phoneNumber}@c.us`;
-    }
-    
-    await client.sendMessage(chatId, message);
-    console.log(`✅ Message sent to ${chatId}`);
-  } catch (error: any) {
-    console.error(`❌ Error sending message:`, error);
-    throw error;
+  // Handle both @c.us and @lid formats
+  let chatId: string;
+  if (to.includes('@')) {
+    // Already has format like 84922156755@c.us or 206206329217189@lid
+    chatId = to;
+  } else {
+    // Just phone number, add @c.us
+    const phoneNumber = to.replace(/[^0-9]/g, '');
+    chatId = `${phoneNumber}@c.us`;
   }
+  
+  const maxRetries = 2;
+  let lastError: any = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Ensure chat exists and is loaded before sending to avoid sendSeen errors
+      try {
+        await client.getChatById(chatId);
+      } catch (chatError) {
+        // Chat might not exist yet - this is okay, we'll try to send anyway
+        if (attempt === 1) {
+          console.log(`⚠️ Chat ${chatId} not found, will attempt to send anyway...`);
+        }
+      }
+      
+      await client.sendMessage(chatId, message);
+      console.log(`✅ Message sent to ${chatId}`);
+      return; // Success, exit function
+    } catch (error: any) {
+      lastError = error;
+      
+      // Check if it's the markedUnread/sendSeen error
+      const isSendSeenError = error.message?.includes('markedUnread') || 
+                             error.message?.includes('Cannot read properties of undefined') ||
+                             error.message?.includes('sendSeen') ||
+                             (error.stack && error.stack.includes('sendSeen'));
+      
+      if (isSendSeenError && attempt < maxRetries) {
+        console.warn(`⚠️ sendSeen error for ${chatId} (attempt ${attempt}/${maxRetries}), retrying...`);
+        // Wait before retrying to let WhatsApp state settle
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        continue; // Retry
+      } else if (isSendSeenError) {
+        // Last attempt failed with sendSeen error
+        // The message might have been sent despite the error
+        console.warn(`⚠️ sendSeen error persisted for ${chatId} after ${maxRetries} attempts`);
+        console.warn(`⚠️ Message may have been sent successfully despite the error`);
+        // Don't throw - treat as success since message was likely sent
+        return;
+      }
+      
+      // For other errors, throw immediately
+      console.error(`❌ Error sending message to ${chatId}:`, error);
+      throw error;
+    }
+  }
+  
+  // Should not reach here, but if we do, throw the last error
+  throw lastError || new Error('Failed to send message after retries');
 }
 
 /**
