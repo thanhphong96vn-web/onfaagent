@@ -137,6 +137,16 @@
     const botName = botSettings?.name || 'AI Assistant';
     const welcomeMessage = botSettings?.welcomeMessage;
     
+    // Get the base path for images (same directory structure as script)
+    let imageBasePath = '';
+    if (scriptTag && scriptTag.src) {
+      const scriptUrl = new URL(scriptTag.src);
+      imageBasePath = scriptUrl.origin + scriptUrl.pathname.replace(/\/[^/]*$/, '/images/DRACO_FlyingIdle.gif');
+    } else {
+      // Fallback to relative path
+      imageBasePath = './images/DRACO_FlyingIdle.gif';
+    }
+    
     console.log('Creating widget with:', { themeColor, botName, welcomeMessage, botSettings });
     
     const widget = document.createElement('div');
@@ -144,9 +154,7 @@
     widget.innerHTML = `
       <div class="chatbot-container">
         <div class="chatbot-button" id="chatbot-toggle">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <img src="${imageBasePath}" alt="Chat" style="width: 100%; height: 100%; object-fit: contain;" id="chatbot-icon-img" />
         </div>
         <div class="chatbot-modal" id="chatbot-modal">
           <div class="chatbot-header">
@@ -183,9 +191,9 @@
       }
 
       .chatbot-button {
-        width: 60px;
-        height: 60px;
-        background: linear-gradient(135deg, var(--chatbot-primary), var(--chatbot-primary-hover));
+        width: 250px;
+        height: 250px;
+        background: transparent;
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -196,6 +204,8 @@
         color: white;
         position: relative;
         overflow: hidden;
+        padding: 0;
+        border: none;
       }
 
       .chatbot-button::before {
@@ -225,7 +235,7 @@
 
       .chatbot-modal {
         position: absolute;
-        bottom: 80px;
+        bottom: 270px;
         right: 0;
         width: 380px;
         height: 520px;
@@ -460,6 +470,30 @@
 
     document.head.appendChild(styles);
     document.body.appendChild(widget);
+
+    // Set up fallback to SVG icon if GIF fails to load
+    const iconImg = document.getElementById('chatbot-icon-img');
+    const chatbotButton = document.getElementById('chatbot-toggle');
+    const chatbotModal = document.getElementById('chatbot-modal');
+    
+    if (iconImg) {
+      iconImg.addEventListener('error', function() {
+        // Replace image with SVG icon
+        chatbotButton.innerHTML = `
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        `;
+        // Reset button size to original 60px
+        chatbotButton.style.width = '60px';
+        chatbotButton.style.height = '60px';
+        chatbotButton.style.background = 'linear-gradient(135deg, var(--chatbot-primary), var(--chatbot-primary-hover))';
+        // Adjust modal position back to original
+        if (chatbotModal) {
+          chatbotModal.style.bottom = '80px';
+        }
+      });
+    }
 
     return widget;
   }
