@@ -191,8 +191,8 @@
       }
 
       .chatbot-button {
-        width: 120px;
-        height: 120px;
+        width: 150px;
+        height: 150px;
         background: transparent;
         border-radius: 50%;
         display: flex;
@@ -221,15 +221,15 @@
 
       @media (max-width: 768px) {
         .chatbot-button {
-          width: 100px;
-          height: 100px;
+          width: 120px;
+          height: 120px;
         }
       }
 
       @media (max-width: 480px) {
         .chatbot-button {
-          width: 80px;
-          height: 80px;
+          width: 100px;
+          height: 100px;
         }
       }
 
@@ -239,7 +239,7 @@
 
       .chatbot-modal {
         position: absolute;
-        bottom: 140px;
+        bottom: 170px;
         right: 0;
         width: 380px;
         height: 520px;
@@ -250,23 +250,37 @@
         display: none;
         flex-direction: column;
         overflow: hidden;
+        transition: bottom 0.3s ease-out;
       }
 
       @media (max-width: 768px) {
         .chatbot-modal {
-          bottom: 120px;
+          bottom: 140px;
         }
       }
 
       @media (max-width: 480px) {
         .chatbot-modal {
-          bottom: 100px;
+          bottom: 120px;
         }
       }
 
       .chatbot-modal.open {
         display: flex;
         animation: slideUp 0.3s ease-out;
+        bottom: 20px;
+      }
+
+      @media (max-width: 768px) {
+        .chatbot-modal.open {
+          bottom: 10px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .chatbot-modal.open {
+          bottom: 10px;
+        }
       }
 
       @keyframes slideUp {
