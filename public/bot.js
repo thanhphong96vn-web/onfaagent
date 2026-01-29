@@ -191,8 +191,8 @@
       }
 
       .chatbot-button {
-        width: 250px;
-        height: 250px;
+        width: 120px;
+        height: 120px;
         background: transparent;
         border-radius: 50%;
         display: flex;
@@ -208,25 +208,29 @@
         border: none;
       }
 
-      .chatbot-button::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-        transform: translateX(-100%);
-        transition: transform 0.6s;
-      }
-
-      .chatbot-button:hover::before {
-        transform: translateX(100%);
+      .chatbot-button.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: scale(0);
       }
 
       .chatbot-button:hover {
-        transform: scale(1.1) rotate(5deg);
+        transform: scale(1.05);
         box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+      }
+
+      @media (max-width: 768px) {
+        .chatbot-button {
+          width: 100px;
+          height: 100px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .chatbot-button {
+          width: 80px;
+          height: 80px;
+        }
       }
 
       .chatbot-button:active {
@@ -235,7 +239,7 @@
 
       .chatbot-modal {
         position: absolute;
-        bottom: 270px;
+        bottom: 140px;
         right: 0;
         width: 380px;
         height: 520px;
@@ -246,6 +250,18 @@
         display: none;
         flex-direction: column;
         overflow: hidden;
+      }
+
+      @media (max-width: 768px) {
+        .chatbot-modal {
+          bottom: 120px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .chatbot-modal {
+          bottom: 100px;
+        }
       }
 
       .chatbot-modal.open {
@@ -492,6 +508,8 @@
         if (chatbotModal) {
           chatbotModal.style.bottom = '80px';
         }
+        // Remove responsive classes that might interfere
+        chatbotButton.classList.remove('hidden');
       });
     }
 
@@ -704,14 +722,17 @@
   // Toggle chat modal
   function toggleChat() {
     const modal = document.getElementById('chatbot-modal');
+    const button = document.getElementById('chatbot-toggle');
     isOpen = !isOpen;
     
     if (isOpen) {
       modal.classList.add('open');
+      if (button) button.classList.add('hidden');
       document.getElementById('chatbot-input').focus();
       trackEvent('chat_opened');
     } else {
       modal.classList.remove('open');
+      if (button) button.classList.remove('hidden');
       trackEvent('chat_closed');
     }
   }
