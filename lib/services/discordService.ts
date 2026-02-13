@@ -44,7 +44,7 @@ export async function sendDiscordMessage(
 ): Promise<DiscordMessage> {
   try {
     const channel = await client.channels.fetch(channelId);
-    
+
     if (!channel) {
       throw new Error(`Channel ${channelId} not found`);
     }
@@ -102,7 +102,7 @@ export async function handleDiscordMessage(
   if (botId) {
     const normalizedBotId = botId.trim();
     console.log(`🔍 Looking for bot with botId: "${normalizedBotId}"`);
-    
+
     // Check cache first
     const cacheKey = `discord_${normalizedBotId}`;
     const cached = botSettingsCache.get(cacheKey);
@@ -110,12 +110,12 @@ export async function handleDiscordMessage(
       console.log(`✅ Using cached bot settings for: ${normalizedBotId}`);
       botSettings = cached.settings;
     } else {
-      botSettings = await BotSettings.findOne({ 
+      botSettings = await BotSettings.findOne({
         botId: normalizedBotId,
         'discord.enabled': true,
         'discord.botToken': { $exists: true }
       }).select('botId name userId discord welcomeMessage faqs documents urls structuredData updatedAt').lean() as any;
-      
+
       if (botSettings) {
         botSettingsCache.set(cacheKey, { settings: botSettings, timestamp: Date.now() });
       }
@@ -171,7 +171,7 @@ export async function handleDiscordMessage(
 
   try {
     console.log(`🤖 Processing message with AI: "${text}"`);
-    
+
     // Debug: Log botSettings structure
     console.log(`[DISCORD] Bot settings check:`);
     console.log(`[DISCORD]   Bot ID: ${botSettings.botId}`);
@@ -179,7 +179,7 @@ export async function handleDiscordMessage(
     console.log(`[DISCORD]   Documents count: ${botSettings.documents?.filter((d: any) => d.enabled)?.length || 0}`);
     console.log(`[DISCORD]   URLs count: ${botSettings.urls?.filter((u: any) => u.enabled)?.length || 0}`);
     console.log(`[DISCORD]   Structured data count: ${botSettings.structuredData?.filter((s: any) => s.enabled)?.length || 0}`);
-    
+
     const reply = await processChatMessage(
       botSettings,
       text,
@@ -216,8 +216,8 @@ export async function handleDiscordMessage(
     const errorMsg = error.message?.includes('timeout')
       ? 'Xin lỗi, yêu cầu của bạn mất quá nhiều thời gian để xử lý. Vui lòng thử lại sau.'
       : error.message?.includes('Rate limit')
-      ? 'Xin lỗi, hệ thống đang quá tải. Vui lòng thử lại sau vài giây.'
-      : 'Xin lỗi, tôi đang gặp sự cố khi xử lý tin nhắn của bạn. Vui lòng thử lại sau.';
+        ? 'Xin lỗi, hệ thống đang quá tải. Vui lòng thử lại sau vài giây.'
+        : 'Xin lỗi, tôi đang gặp sự cố khi xử lý tin nhắn của bạn. Vui lòng thử lại sau.';
 
     try {
       await sendDiscordMessage(message.client, channelId, errorMsg);

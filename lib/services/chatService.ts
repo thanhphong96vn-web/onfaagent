@@ -17,7 +17,7 @@ const PROMPT_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 export function invalidateKnowledgeBaseCache(botId: string): void {
   // Clear all cache entries that match this botId
   const keysToDelete: string[] = [];
-  
+
   // Clear knowledge base cache
   for (const key of knowledgeBaseCache.keys()) {
     if (key.startsWith(`${botId}_`)) {
@@ -25,7 +25,7 @@ export function invalidateKnowledgeBaseCache(botId: string): void {
     }
   }
   keysToDelete.forEach(key => knowledgeBaseCache.delete(key));
-  
+
   // Clear system prompt cache
   const promptKeysToDelete: string[] = [];
   for (const key of systemPromptCache.keys()) {
@@ -34,7 +34,7 @@ export function invalidateKnowledgeBaseCache(botId: string): void {
     }
   }
   promptKeysToDelete.forEach(key => systemPromptCache.delete(key));
-  
+
   if (keysToDelete.length > 0 || promptKeysToDelete.length > 0) {
     console.log(`🗑️ Invalidated knowledge base cache for bot: ${botId} (${keysToDelete.length} KB entries, ${promptKeysToDelete.length} prompt entries)`);
   }
@@ -64,7 +64,7 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
   // Use cache key based on botId and updatedAt timestamp
   const cacheKey = `${botSettings.botId}_${botSettings.updatedAt?.getTime() || 0}`;
   const cached = knowledgeBaseCache.get(cacheKey);
-  
+
   // Check if cache is valid
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     // If maxLength specified and cached is longer, truncate intelligently
@@ -97,7 +97,7 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
   if (enabledDocuments.length > 0) {
     knowledgeBase += 'Document Knowledge Base:\n';
     enabledDocuments.forEach((doc: any) => {
-      const content = doc.content?.length > MAX_DOC_LENGTH 
+      const content = doc.content?.length > MAX_DOC_LENGTH
         ? doc.content.substring(0, MAX_DOC_LENGTH) + '...[content continues]'
         : doc.content || '';
       knowledgeBase += `\n--- ${doc.name} (${doc.type.toUpperCase()}) ---\n`;
@@ -177,41 +177,57 @@ export function buildKnowledgeBase(botSettings: IBotSettings, maxLength?: number
  */
 function truncateKnowledgeBase(kb: string, maxLength: number): string {
   if (kb.length <= maxLength) return kb;
-  
+
   // Extract FAQs section first - FAQs MUST NEVER be truncated, they are the most important
   const faqsMatch = kb.match(/FAQs:\n([\s\S]*?)(?=\n\n(?:Document|Web Content|Structured Data) Knowledge Base:|$)/);
   const faqsSection = faqsMatch ? `FAQs:\n${faqsMatch[1]}\n\n` : '';
   const kbWithoutFaqs = kb.replace(/FAQs:\n[\s\S]*?\n\n/, '');
-  
-  // CRITICAL: FAQs are NEVER truncated - they take priority over everything else
-  // If FAQs alone exceed maxLength, we still include them fully (they're that important)
-  // Only truncate other sections (URLs, Documents, Structured Data)
+
+  // CRITICAL UPDATE: FAQs are typically prioritized, BUT if they are massive (e.g., > 100k chars),
+  // they MUST be truncated to avoid token limits and timeouts.
   const faqsLength = faqsSection.length;
-  
-  // If FAQs alone exceed maxLength, return FAQs only (they're more important than other sections)
-  if (faqsLength >= maxLength) {
-    console.warn(`⚠️ FAQs section (${faqsLength} chars) exceeds maxLength (${maxLength} chars), but FAQs are NEVER truncated - returning FAQs only`);
-    return faqsSection + '\n\n[Note: FAQs are prioritized and never truncated. Other knowledge base sections (URLs, Documents, Structured Data) are excluded to ensure all FAQs are available.]';
+
+  // We set a hard limit for FAQs to ensure the prompt fits within context.
+  const MAX_FAQ_LENGTH = Math.min(maxLength, 30000); // Hard limit for FAQs
+
+  // If FAQs alone exceed maxLength or the hard limit, we MUST truncate them
+  if (faqsLength >= MAX_FAQ_LENGTH) {
+    console.warn(`⚠️ FAQs section (${faqsLength} chars) exceeds safety limit (${MAX_FAQ_LENGTH} chars) - Truncating FAQs`);
+    // Truncate FAQs but keep the structure
+    const truncatedFaqs = faqsSection.substring(0, MAX_FAQ_LENGTH) + '...[FAQs truncated due to size limits]\n\n';
+    return truncatedFaqs + '\n\n[Note: FAQs were truncated to prevent system timeout. Some information may be missing.]';
+  } else if (faqsLength >= maxLength) {
+    // If FAQs fit within hard limit but exceed the total requested maxLength, return them (they are high priority)
+    // but maybe we should still respect maxLength if it's a fallback retry?
+    // If this is a fallback (maxLength < 10000), we should strictly respect it.
+    if (maxLength < 10000) {
+      console.warn(`⚠️ Fallback mode: FAQs (${faqsLength}) > maxLength (${maxLength}) - Truncating FAQs`);
+      const truncatedFaqs = faqsSection.substring(0, maxLength - 200) + '...[truncated]\n\n';
+      return truncatedFaqs;
+    }
+
+    console.warn(`⚠️ FAQs section (${faqsLength} chars) exceeds maxLength (${maxLength} chars), but returning full FAQs as priority (within safety limit)`);
+    return faqsSection + '\n\n[Note: FAQs are prioritized. Other knowledge base sections (URLs, Documents, Structured Data) are excluded to ensure FAQs are available.]';
   }
-  
+
   // Calculate remaining space for other sections after FAQs
   const remainingLengthForOthers = maxLength - faqsLength - 200; // Reserve 200 for separators/notes
-  
+
   // If no space left for other sections after FAQs, return FAQs only
   if (remainingLengthForOthers <= 0) {
     console.warn('⚠️ FAQs section takes up all available space, returning FAQs only');
-    return faqsSection + '\n\n[Note: FAQs are prioritized and never truncated. Other knowledge base sections truncated due to size limits]';
+    return faqsSection + '\n\n[Note: FAQs are prioritized. Other knowledge base sections truncated due to size limits]';
   }
-  
+
   // Truncate other sections (documents, URLs, structured data) intelligently
   // Prioritize URLs over documents and structured data
   const urlSectionMatch = kbWithoutFaqs.match(/Web Content Knowledge Base:\n([\s\S]*?)(?=\n\n(?:Document|Structured Data) Knowledge Base:|$)/);
   const docSectionMatch = kbWithoutFaqs.match(/Document Knowledge Base:\n([\s\S]*?)(?=\n\n(?:Web Content|Structured Data) Knowledge Base:|$)/);
   const structSectionMatch = kbWithoutFaqs.match(/Structured Data Knowledge Base:\n([\s\S]*?)$/);
-  
+
   let result = faqsSection; // Start with FAQs (NEVER truncated)
   let remainingLength = remainingLengthForOthers; // Use the calculated remainingLengthForOthers
-  
+
   // Add URLs first (they're important)
   if (urlSectionMatch && remainingLength > 100) {
     const urlSection = `Web Content Knowledge Base:\n${urlSectionMatch[1]}\n\n`;
@@ -225,7 +241,7 @@ function truncateKnowledgeBase(kb: string, maxLength: number): string {
       remainingLength = 0;
     }
   }
-  
+
   // Add Documents if space available
   if (docSectionMatch && remainingLength > 100) {
     const docSection = `Document Knowledge Base:\n${docSectionMatch[1]}\n\n`;
@@ -238,7 +254,7 @@ function truncateKnowledgeBase(kb: string, maxLength: number): string {
       remainingLength = 0;
     }
   }
-  
+
   // Add Structured Data if space available
   if (structSectionMatch && remainingLength > 100) {
     const structSection = `Structured Data Knowledge Base:\n${structSectionMatch[1]}\n\n`;
@@ -249,7 +265,7 @@ function truncateKnowledgeBase(kb: string, maxLength: number): string {
       result += truncatedStruct;
     }
   }
-  
+
   return result.trim() + '\n\n[Note: Knowledge base sections prioritized: FAQs > URLs > Documents > Structured Data]';
 }
 
@@ -283,7 +299,7 @@ export function generateSystemPrompt(botSettings: IBotSettings, platform?: strin
   // Use cache key based on botId, updatedAt, and platform
   const cacheKey = `${botSettings.botId}_${botSettings.updatedAt?.getTime() || 0}_${platform || 'default'}_${maxKbLength || 'full'}`;
   const cached = systemPromptCache.get(cacheKey);
-  
+
   // Check if cache is valid
   if (cached && Date.now() - cached.timestamp < PROMPT_CACHE_TTL) {
     return cached.prompt;
@@ -291,7 +307,7 @@ export function generateSystemPrompt(botSettings: IBotSettings, platform?: strin
 
   // Build knowledge base with optional length limit
   const knowledgeBase = buildKnowledgeBase(botSettings, maxKbLength);
-  
+
   // Debug logging for knowledge base with platform context
   const platformTag = platform ? `[${platform.toUpperCase()}]` : '';
   console.log(`${platformTag} 📚 Knowledge base built:`);
@@ -301,9 +317,10 @@ export function generateSystemPrompt(botSettings: IBotSettings, platform?: strin
   console.log(`${platformTag}    Has Documents: ${knowledgeBase.includes('Document Knowledge Base:')}`);
   console.log(`${platformTag}    Has URLs: ${knowledgeBase.includes('Web Content Knowledge Base:')}`);
   console.log(`${platformTag}    Has Structured Data: ${knowledgeBase.includes('Structured Data Knowledge Base:')}`);
-  
+
   // Unified platform context for all platforms to ensure consistent responses
-  const platformContext = 'Provide informative answers with key details and relevant information. Balance between being comprehensive and concise. Be helpful, friendly, and professional.';
+  // Unified platform context for all platforms to ensure consistent responses
+  const platformContext = 'Format your response like a structured report or dashboard. Use horizontal lines to separate sections. Use emojis for every key point. Make it look professional and data-rich.';
 
   // Enhanced prompt structure with EXTREMELY STRONG emphasis on using knowledge base
   // This prompt is designed to force the AI to search thoroughly before saying "I don't know"
@@ -321,14 +338,31 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
    - If user asks "The Golden Era", search for: "Golden Era", "golden era", "Golden", "Era", "NFT", "mining", "khai thác"
    - If user asks "Wonderful Holiday", search for: "Wonderful", "Holiday", "wonderful", "holiday", "NFT", "collection"
    - If user asks about any NFT, search ALL FAQs for that NFT name, related terms, and synonyms
-6. ANSWER FORMAT: When you find information, provide it directly and clearly. Cite the source if helpful (e.g., "According to the FAQs..." or "Based on the knowledge base...")
-7. COMPLETE ANSWERS: Provide complete answers with all relevant details from the knowledge base
-8. BE THOROUGH: Read through ALL FAQs carefully - they contain the most important information
+6. ANSWER FORMAT:
+   - STRUCTURE: Use a structured, "report-like" format with clear sections.
+   - HEADERS: Use emojis + capitalized headers for each section (e.g., "📊 TÍNH TOÁN LỢI NHUẬN", "💰 THÔNG TIN CHI TIẾT").
+   - SEPARATORS: Use dividing lines (e.g., "--------------------") between sections to create a clean visual layout.
+   - LISTS: Present data and key points vertically using bullet points. Avoid long paragraphs.
+   - EMOJIS: Use relevant emojis for EVERY bullet point to make it visually engaging (e.g., 💵 for money, 📈 for charts, ✅ for results).
+   - LENGTH: Do not be afraid to make the response long and vertical. Use whitespace effectively.
+7. COMPLETE ANSWERS: Provide complete answers with all relevant details from the knowledge base.
+8. BE THOROUGH: Read through ALL FAQs carefully - they contain the most important information.
+9. TONE & STYLE: Be professional yet friendly. Use a "Financial Advisor" or "Expert Support" persona.
+10. EXAMPLE FORMAT:
+   "[Emoji] [HEADER TITLE]
+   --------------------
+   [Emoji] [Sub-header if needed]
+   - [Emoji] Point 1
+   - [Emoji] Point 2: Value
+
+   --------------------
+   [Emoji] [Conclusion/Summary]
+   [Text]"
 
 REMEMBER: The knowledge base above is YOUR ONLY SOURCE OF INFORMATION. If information exists there, you MUST find it and provide it. Only say "I don't have that information" if you have searched EVERYTHING and found NOTHING.
 
 ${platformContext}`;
-  
+
   // Debug: Log prompt length with platform context
   console.log(`${platformTag} 📝 System prompt length: ${prompt.length} chars`);
 
@@ -401,14 +435,151 @@ export async function processChatMessage(
   const openai = getOpenAIClient(apiKey);
   const startTime = Date.now();
 
+  // Check for crypto keywords
+  const cryptoKeywords = ['price', 'giá', 'gia', 'oft', 'onfa', 'coin', 'token', 'thị trường', 'market'];
+  const lowerMsg = message.toLowerCase();
+  let cryptoData = '';
+
+  if (cryptoKeywords.some(k => lowerMsg.includes(k))) {
+    try {
+      // Dynamically import to avoid circular dependencies if any
+      const { getCryptoPrice } = await import('@/lib/services/cryptoService');
+
+      // Attempt to extract coin name dynamically
+      let queryCoin = '';
+      let calcAmount: number | null = null;
+      let calcIntent = false;
+
+      // Regex for Profit Calculation: "interest 1000 OFT", "tính lãi 1000 OFT", "profit 1000 OFT"
+      const calcRegex = /(?:calculate|tính|lãi|lãi suất|profit|interest)\s+(?:cho|for)?\s*([\d,.]+)\s*([a-zA-Z0-9\s]+)/i;
+      const calcMatch = lowerMsg.match(calcRegex);
+
+      if (calcMatch) {
+        calcIntent = true;
+        // Remove commas from amount
+        const rawAmount = calcMatch[1].replace(/,/g, '');
+        calcAmount = parseFloat(rawAmount);
+        queryCoin = calcMatch[2].trim();
+      } else {
+        // Regex for common queries: "price of X", "price X", "giá X", "X price"
+        // We look for the keyword and capture the potential coin name
+        // Fix: Use \s+ to ensure space, and \b to ensure 'of' is a whole word
+        const priceRegex = /(?:price|giá|gia|giá trị|value)\s+(?:(?:\bof\b|của|là)\s+)?([a-zA-Z0-9\s]+)/i;
+        const match = lowerMsg.match(priceRegex);
+
+        if (match && match[1]) {
+          queryCoin = match[1].trim();
+        } else {
+          // Fallbacks as before...
+          const words = lowerMsg.split(/\s+/);
+          if (words.length <= 2) {
+            queryCoin = lowerMsg.replace(/price|giá|coin|token/g, '').trim();
+          } else {
+            if (lowerMsg.includes('oft') || lowerMsg.includes('onfa')) queryCoin = 'onfa';
+            else if (lowerMsg.includes('btc') || lowerMsg.includes('bitcoin')) queryCoin = 'bitcoin';
+            else if (lowerMsg.includes('eth') || lowerMsg.includes('ethereum')) queryCoin = 'ethereum';
+            else if (lowerMsg.includes('bnb')) queryCoin = 'binancecoin';
+          }
+        }
+      }
+
+      // If we extracted a potential coin name, query it
+      if (queryCoin && queryCoin.length > 1 && queryCoin.length < 20) {
+        console.log(`🔍 Detected crypto query for: ${queryCoin} (Intent: ${calcIntent ? 'Calculation' : 'Price'})`);
+        const priceInfo = await getCryptoPrice(queryCoin);
+
+        if (priceInfo) {
+          cryptoData = priceInfo;
+
+          // If Calculation Intent, we perform additional math and prep extra context
+          if (calcIntent && calcAmount !== null && !isNaN(calcAmount)) {
+            // Extract price from the formatted string (e.g. Price: $0.70)
+            const priceMatch = priceInfo.match(/Price: \$([\d,.]+)/);
+            const currentPrice = priceMatch ? parseFloat(priceMatch[1].replace(/,/g, '')) : 0;
+            const totalValue = currentPrice * calcAmount;
+
+            const calcContext = `
+[🧮 PROFIT CALCULATION REQUEST DATA]
+- User wants to calculate profit for: ${calcAmount.toLocaleString()} ${queryCoin.toUpperCase()}
+- Current Price: $${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+- Total Initial Value (Deposit): $${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+- INSTRUCTION: 
+  1. Use the "Knowledge Base" to find current Interest Rates (Lãi suất) and Terms (Kỳ hạn) for ${queryCoin}.
+  2. If found, calculate the estimated profit.
+  3. Respond using the STRICT FORMAT below (matches user screenshot):
+  
+  📊 Tính Toán Lợi Nhuận Dự Kiến
+  --------------------
+  💰 Thông Tin Deposit
+  - Token: ${queryCoin.toUpperCase()}
+  - Số lượng: ${calcAmount.toLocaleString()} ${queryCoin.toUpperCase()}
+  - Giá hiện tại: $${currentPrice} /token
+  - Giá trị USD: $${totalValue.toLocaleString()}
+
+  📈 Thông Tin Lợi Nhuận
+  - Kỳ hạn: [Found in KB, e.g., 30 ngày]
+  - Lãi suất: [Found in KB, e.g., 7-12%/tháng]
+  
+  ✅ Kết Quả Sau [Term]
+  - Lợi nhuận: [Calculate: Value * Rate]
+  - Tổng nhận: [Calculate: Value + Profit]
+
+  📝 Cân bằng giữa lợi nhuận và rủi ro
+`;
+            cryptoData += calcContext;
+          }
+
+          console.log(`✅ Injected crypto data for ${queryCoin}`);
+        }
+      }
+
+    } catch (err) {
+      console.error('Error fetching crypto data:', err);
+    }
+  }
+
   // Try with optimized knowledge base first
   try {
     // Use unified knowledge base size for all platforms to ensure consistent responses
     // Increased to 50000 to ensure FAQs (338 items = ~34k chars) are NEVER truncated
     // FAQs are the most important and must be included in full for accurate responses
     const maxKbLength = 50000; // Increased limit to ensure FAQs are never truncated
-    const systemPrompt = generateSystemPrompt(botSettings, platform, maxKbLength);
-    
+    let systemPrompt = generateSystemPrompt(botSettings, platform, maxKbLength);
+
+    // Inject crypto data if available
+    // CRITICAL UPDATE: We PREPEND the data to the prompt to ensure it's the first thing the AI sees.
+    // We also add a specific instruction to prioritize this data.
+    if (cryptoData) {
+      const cryptoInjection = `
+[🚨 LIVE MARKET DATA - HIGH PRIORITY]
+${cryptoData}
+[INSTRUCTION: Use the above Live Market Data to answer questions about price/market. It overrides any other information.]
+[NOTE: OFT is the ticker symbol for ONFA. If user asks about OFT, use the ONFA data above.]
+[FORMATTING REQUIREMENT: You MUST use the following format for ANY coin price response:]
+[CRITICAL: Do not add any extra dashes or lines at the very bottom.]
+[CRITICAL: Bold ONLY the keys (e.g., **Giá hiện tại:**), NOT the values.]
+
+📊 GIÁ [TOKEN NAME] ([SYMBOL])
+--------------------
+• **Giá hiện tại:** $[Price]
+• **Thay đổi trong 24 giờ:** [Change]% [Trend Emoji]
+• **Cập nhật:** [Time] (Nguồn: CoinGecko)
+
+--------------------
+💡 Thông tin bổ sung
+• [Write 1-2 positive/neutral sentences about the trend]
+
+--------------------
+📈 Kết luận
+[Summary sentence about the price action]
+
+Hãy theo dõi thường xuyên để cập nhật thông tin mới nhất!
+---------------------------------------------------
+`;
+      systemPrompt = cryptoInjection + systemPrompt;
+      console.log('✅ Injected crypto data at START of system prompt');
+    }
+
     const completion = await Promise.race([
       openai.chat.completions.create({
         model: 'gpt-4o-mini',
@@ -424,7 +595,7 @@ export async function processChatMessage(
         presence_penalty: 0,
       }),
       // Reduced timeout - 15 seconds for faster failure detection
-      new Promise<never>((_, reject) => 
+      new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('OpenAI API timeout after 15 seconds')), 15000)
       )
     ]);
@@ -432,28 +603,28 @@ export async function processChatMessage(
     const elapsed = Date.now() - startTime;
     const platformTag = platform ? `[${platform.toUpperCase()}]` : '';
     console.log(`${platformTag} ✅ OpenAI API response received in ${elapsed}ms`);
-    
+
     // Normalize response text: remove excessive line breaks
     let response = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
-    
+
     // Normalize multiple consecutive newlines (3+ newlines become 2, 2+ newlines become 1)
     // This prevents excessive spacing while preserving intentional paragraph breaks
     response = response.replace(/\n{3,}/g, '\n\n'); // 3+ newlines -> 2 newlines
     response = response.replace(/\n{2}/g, '\n'); // 2 newlines -> 1 newline
-    
+
     // Trim leading/trailing whitespace and newlines
     response = response.trim();
-    
+
     return response;
   } catch (error: any) {
     // If timeout and prompt is too long, try with shorter knowledge base
     if (error.message?.includes('timeout')) {
       console.warn('⚠️ Timeout with full knowledge base, trying with reduced content...');
-      
+
       try {
         // Try with reduced knowledge base (max 6000 chars) if timeout - faster fallback
         const reducedPrompt = generateSystemPrompt(botSettings, platform, 6000);
-        
+
         const completion = await Promise.race([
           openai.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -469,31 +640,31 @@ export async function processChatMessage(
             presence_penalty: 0,
           }),
           // Reduced timeout for fallback - 15 seconds
-          new Promise<never>((_, reject) => 
+          new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('OpenAI API timeout after 15 seconds')), 15000)
           )
         ]);
 
         const elapsed = Date.now() - startTime;
         console.log(`✅ OpenAI API response received (fallback) in ${elapsed}ms`);
-        
+
         // Normalize response text: remove excessive line breaks
         let response = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
-        
+
         // Normalize multiple consecutive newlines (3+ newlines become 2, 2+ newlines become 1)
         response = response.replace(/\n{3,}/g, '\n\n'); // 3+ newlines -> 2 newlines
         response = response.replace(/\n{2}/g, '\n'); // 2 newlines -> 1 newline
-        
+
         // Trim leading/trailing whitespace and newlines
         response = response.trim();
-        
+
         return response;
       } catch (fallbackError: any) {
         console.error('❌ Fallback also failed:', fallbackError);
         throw new Error('Request timeout. Please try again.');
       }
     }
-    
+
     // Better error handling for other errors
     if (error.status === 429) {
       console.error('OpenAI API rate limit:', error);

@@ -1,4 +1,4 @@
-(function() {
+(function () {
   'use strict';
 
   // Configuration
@@ -12,7 +12,7 @@
   const scriptTag = document.querySelector('script[data-bot]');
   const botId = scriptTag ? scriptTag.getAttribute('data-bot') : null;
   const apiUrl = scriptTag ? scriptTag.getAttribute('data-api-url') : null;
-  
+
   // Set API URL dynamically
   if (apiUrl) {
     // Use custom API URL if provided
@@ -39,6 +39,7 @@
   let isLoading = false;
   let conversation = [];
   let botSettings = null;
+  let currentTheme = 'dark';
   let analytics = {
     messagesSent: 0,
     sessionStart: Date.now(),
@@ -105,7 +106,7 @@
   function trackEvent(event, data = {}) {
     analytics.interactions++;
     console.log('Analytics:', event, { ...data, botId, timestamp: Date.now() });
-    
+
     // Send analytics to server (optional)
     if (CONFIG.apiUrl) {
       fetch(CONFIG.apiUrl.replace('/api/public/chat', '/api/analytics'), {
@@ -136,7 +137,7 @@
     const themeColor = botSettings?.themeColor || '#3B82F6';
     const botName = botSettings?.name || 'AI Assistant';
     const welcomeMessage = botSettings?.welcomeMessage;
-    
+
     // Get the base path for images (same directory structure as script)
     let imageBasePath = '';
     if (scriptTag && scriptTag.src) {
@@ -146,9 +147,9 @@
       // Fallback to relative path
       imageBasePath = './images/DRACO_FlyingIdle.gif';
     }
-    
+
     console.log('Creating widget with:', { themeColor, botName, welcomeMessage, botSettings });
-    
+
     const widget = document.createElement('div');
     widget.id = 'chatbot-widget';
     widget.innerHTML = `
@@ -156,10 +157,16 @@
         <div class="chatbot-button" id="chatbot-toggle">
           <img src="${imageBasePath}" alt="Chat" style="width: 100%; height: 100%; object-fit: contain;" id="chatbot-icon-img" />
         </div>
-        <div class="chatbot-modal" id="chatbot-modal">
+        <div class="chatbot-modal" id="chatbot-modal" data-theme="dark">
           <div class="chatbot-header">
             <div class="chatbot-title">${botName}</div>
-            <button class="chatbot-close" id="chatbot-close">×</button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button class="chatbot-theme-toggle" id="chatbot-theme-toggle" title="Toggle dark/light mode">
+                <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              </button>
+              <button class="chatbot-close" id="chatbot-close">×</button>
+            </div>
           </div>
           <div class="chatbot-messages" id="chatbot-messages">
             <!-- Welcome message will be loaded dynamically -->
@@ -179,11 +186,52 @@
         --chatbot-primary: ${themeColor};
         --chatbot-primary-hover: ${adjustColor(themeColor, -20)};
         --chatbot-primary-light: ${adjustColor(themeColor, 40)};
+        
+        /* Theme variables */
+        --chatbot-bg: rgba(255, 255, 255, 0.95);
+        --chatbot-text: #374151;
+        --chatbot-bot-msg-bg: #f3f4f6;
+        --chatbot-bot-msg-text: #374151;
+        --chatbot-input-bg: #ffffff;
+        --chatbot-input-text: #374151;
+        --chatbot-border: #e5e7eb;
+        
         position: fixed;
         bottom: 20px;
         right: 20px;
         z-index: 10000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      .chatbot-modal[data-theme="dark"] {
+        --chatbot-bg: rgba(10, 10, 10, 0.96);
+        --chatbot-text: #f3f4f6;
+        --chatbot-bot-msg-bg: #1e1f22;
+        --chatbot-bot-msg-text: #f3f4f6;
+        --chatbot-input-bg: #18191c;
+        --chatbot-input-text: #ffffff;
+        --chatbot-border: #2b2d31;
+      }
+
+      .chatbot-modal[data-theme="dark"] .chatbot-messages {
+        scrollbar-color: #374151 transparent;
+      }
+
+      .chatbot-modal[data-theme="dark"] .chatbot-messages::-webkit-scrollbar {
+        width: 10px;
+      }
+
+      .chatbot-modal[data-theme="dark"] .chatbot-messages::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .chatbot-modal[data-theme="dark"] .chatbot-messages::-webkit-scrollbar-thumb {
+        background: #374151;
+        border-radius: 10px;
+      }
+
+      .chatbot-modal[data-theme="dark"] .chatbot-messages::-webkit-scrollbar-thumb:hover {
+        background: #4b5563;
       }
 
       .chatbot-container {
@@ -243,14 +291,15 @@
         right: 0;
         width: 380px;
         height: 520px;
-        background: rgba(255, 255, 255, 0.95);
+        background: var(--chatbot-bg);
         backdrop-filter: blur(20px);
         border-radius: 20px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
         display: none;
         flex-direction: column;
         overflow: hidden;
-        transition: bottom 0.3s ease-out;
+        transition: bottom 0.3s ease-out, background 0.3s ease;
+        color: var(--chatbot-text);
       }
 
       @media (max-width: 768px) {
@@ -326,18 +375,34 @@
         font-size: 16px;
       }
 
-      .chatbot-close {
+      .chatbot-close, .chatbot-theme-toggle {
         background: none;
         border: none;
         color: white;
         font-size: 24px;
         cursor: pointer;
         padding: 0;
-        width: 24px;
-        height: 24px;
+        width: 32px;
+        height: 32px;
         display: flex;
         align-items: center;
         justify-content: center;
+        border-radius: 8px;
+        transition: background-color 0.2s;
+        opacity: 0.9;
+      }
+
+      .chatbot-close:hover, .chatbot-theme-toggle:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        opacity: 1;
+      }
+
+      .chatbot-theme-toggle svg {
+        transition: transform 0.3s ease;
+      }
+
+      .chatbot-theme-toggle:active svg {
+        transform: rotate(45deg);
       }
 
       .chatbot-messages {
@@ -403,8 +468,8 @@
       }
 
       .bot-message .message-content {
-        background: #f3f4f6;
-        color: #374151;
+        background: var(--chatbot-bot-msg-bg);
+        color: var(--chatbot-bot-msg-text);
         border-bottom-left-radius: 4px;
       }
 
@@ -416,9 +481,10 @@
 
       .chatbot-input-container {
         padding: 16px;
-        border-top: 1px solid #e5e7eb;
+        border-top: 1px solid var(--chatbot-border);
         display: flex;
         gap: 8px;
+        background: var(--chatbot-bg);
       }
 
       #chatbot-input {
@@ -428,13 +494,14 @@
         border-radius: 24px;
         outline: none;
         font-size: 14px;
-        color: #374151;
-        background-color: #ffffff;
-        box-shadow: 0 0 0 1px #e5e7eb;
+        color: var(--chatbot-input-text);
+        background-color: var(--chatbot-input-bg);
+        box-shadow: 0 0 0 1px var(--chatbot-border);
+        transition: all 0.2s ease;
       }
 
       #chatbot-input:focus {
-        box-shadow: 0 0 0 1.5px var(--chatbot-primary);
+        box-shadow: 0 0 0 1.5px var(--chatbot-primary-hover);
       }
 
       #chatbot-send {
@@ -463,7 +530,7 @@
         align-items: center;
         gap: 4px;
         padding: 12px 16px;
-        background: #f3f4f6;
+        background: var(--chatbot-bot-msg-bg);
         border-radius: 18px;
         max-width: 80px;
       }
@@ -505,9 +572,9 @@
     const iconImg = document.getElementById('chatbot-icon-img');
     const chatbotButton = document.getElementById('chatbot-toggle');
     const chatbotModal = document.getElementById('chatbot-modal');
-    
+
     if (iconImg) {
-      iconImg.addEventListener('error', function() {
+      iconImg.addEventListener('error', function () {
         // Replace image with SVG icon
         chatbotButton.innerHTML = `
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -533,25 +600,25 @@
   // Format message content - convert markdown and newlines to HTML
   function formatMessage(content) {
     if (!content) return '';
-    
+
     // Escape HTML to prevent XSS first
     let formatted = content
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    
+
     // Normalize multiple consecutive newlines (3+ newlines become 2, 2+ newlines become 1)
     // This prevents excessive spacing while preserving intentional paragraph breaks
     formatted = formatted.replace(/\n{3,}/g, '\n\n'); // 3+ newlines -> 2 newlines
     formatted = formatted.replace(/\n{2}/g, '\n'); // 2 newlines -> 1 newline
-    
+
     // Process lists first (before converting newlines)
     // Split into lines to process lists
     const lines = formatted.split('\n');
     const processedLines = [];
     let inList = false;
     let listItems = [];
-    
+
     function closeList() {
       if (listItems.length > 0) {
         processedLines.push('<ul>' + listItems.join('') + '</ul>');
@@ -559,11 +626,11 @@
       }
       inList = false;
     }
-    
+
     lines.forEach((line, index) => {
       // Check for list items: - or * or number.
       const listMatch = line.match(/^(\s*)([-*]\s+|(\d+)\.\s+)(.+)$/);
-      
+
       if (listMatch) {
         if (!inList) {
           inList = true;
@@ -579,30 +646,30 @@
         }
       }
     });
-    
+
     // Close any remaining list
     closeList();
-    
+
     formatted = processedLines.join('\n');
-    
+
     // Convert markdown-style formatting
     // Bold: **text** or __text__
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     formatted = formatted.replace(/__(.*?)__/g, '<strong>$1</strong>');
-    
+
     // Italic: *text* (but not if it's part of **)
     formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>');
     formatted = formatted.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<em>$1</em>');
-    
+
     // Code: `code`
     formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
-    
+
     // Convert single newlines to <br>, but avoid consecutive <br><br>
     formatted = formatted.replace(/\n/g, '<br>');
-    
+
     // Remove consecutive <br> tags (more than 2 consecutive becomes just 2)
     formatted = formatted.replace(/(<br>\s*){3,}/gi, '<br><br>');
-    
+
     return formatted;
   }
 
@@ -611,20 +678,20 @@
     const messagesContainer = document.getElementById('chatbot-messages');
     const messageDiv = document.createElement('div');
     messageDiv.className = `chatbot-message ${isUser ? 'user-message' : 'bot-message'}`;
-    
+
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    
+
     // Format message content for bot messages, plain text for user messages
     if (isUser) {
       contentDiv.textContent = content;
     } else {
       contentDiv.innerHTML = formatMessage(content);
     }
-    
+
     messageDiv.appendChild(contentDiv);
     messagesContainer.appendChild(messageDiv);
-    
+
     // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
@@ -658,7 +725,7 @@
   async function sendMessage(message) {
     try {
       console.log('Sending message to API:', { botId, message, apiUrl: CONFIG.apiUrl });
-      
+
       const response = await fetch(CONFIG.apiUrl, {
         method: 'POST',
         headers: {
@@ -715,10 +782,10 @@
     try {
       // Send to API
       const reply = await sendMessage(message);
-      
+
       // Hide typing indicator
       hideTyping();
-      
+
       // Add bot response
       addMessage(reply);
       conversation.push({ role: 'bot', content: reply });
@@ -738,7 +805,7 @@
     const modal = document.getElementById('chatbot-modal');
     const button = document.getElementById('chatbot-toggle');
     isOpen = !isOpen;
-    
+
     if (isOpen) {
       modal.classList.add('open');
       if (button) button.classList.add('hidden');
@@ -749,6 +816,46 @@
       if (button) button.classList.remove('hidden');
       trackEvent('chat_closed');
     }
+  }
+
+  // Set theme
+  function setTheme(theme) {
+    const modal = document.getElementById('chatbot-modal');
+    const toggleBtn = document.getElementById('chatbot-theme-toggle');
+    if (!modal) return;
+
+    currentTheme = theme;
+    modal.setAttribute('data-theme', theme);
+    localStorage.setItem('chatbot_theme_' + botId, theme);
+
+    if (toggleBtn) {
+      const sunIcon = toggleBtn.querySelector('.sun-icon');
+      const moonIcon = toggleBtn.querySelector('.moon-icon');
+      if (theme === 'dark') {
+        sunIcon.style.display = 'block';
+        moonIcon.style.display = 'none';
+      } else {
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'block';
+      }
+    }
+  }
+
+  // Update dynamic primary color
+  function updatePrimaryColor(color) {
+    const widget = document.getElementById('chatbot-widget');
+    if (widget) {
+      widget.style.setProperty('--chatbot-primary', color);
+      widget.style.setProperty('--chatbot-primary-hover', adjustColor(color, -20));
+      widget.style.setProperty('--chatbot-primary-light', adjustColor(color, 40));
+    }
+  }
+
+  // Toggle theme
+  function toggleTheme() {
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    trackEvent('theme_toggled', { theme: newTheme });
   }
 
   // Load conversation history
@@ -763,7 +870,7 @@
     welcomeDiv.appendChild(welcomeContent);
     messagesContainer.innerHTML = '';
     messagesContainer.appendChild(welcomeDiv);
-    
+
     conversation.forEach(msg => {
       addMessage(msg.content, msg.role === 'user');
     });
@@ -775,21 +882,26 @@
     await loadBotSettings();
     console.log('Bot settings after load:', botSettings);
     const widget = createWidget();
-    
+
     // Track widget initialization
     trackEvent('widget_loaded');
-    
+
     // Event listeners
     document.getElementById('chatbot-toggle').addEventListener('click', toggleChat);
     document.getElementById('chatbot-close').addEventListener('click', toggleChat);
+    document.getElementById('chatbot-theme-toggle').addEventListener('click', toggleTheme);
     document.getElementById('chatbot-send').addEventListener('click', handleUserInput);
-    
+
     document.getElementById('chatbot-input').addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleUserInput();
       }
     });
+
+    // Load saved theme or default to dark
+    const savedTheme = localStorage.getItem('chatbot_theme_' + botId) || 'dark';
+    setTheme(savedTheme);
 
     // Load chat history
     loadChatHistory();

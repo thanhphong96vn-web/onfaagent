@@ -39,7 +39,7 @@ export async function sendWhatsAppMessage(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`📤 Sending WhatsApp message (attempt ${attempt}/${maxRetries})...`);
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -108,7 +108,7 @@ export async function handleWhatsAppMessage(webhookData: any, botId?: string) {
   // Process each entry
   for (const entry of webhookData.entry || []) {
     const changes = entry.changes || [];
-    
+
     for (const change of changes) {
       if (change.field !== 'messages') {
         continue;
@@ -146,7 +146,7 @@ export async function handleWhatsAppMessage(webhookData: any, botId?: string) {
         if (botId) {
           const normalizedBotId = botId.trim();
           console.log(`🔍 Looking for bot with botId: "${normalizedBotId}"`);
-          
+
           // Check cache first
           const cacheKey = `whatsapp_${normalizedBotId}`;
           const cached = botSettingsCache.get(cacheKey);
@@ -154,12 +154,12 @@ export async function handleWhatsAppMessage(webhookData: any, botId?: string) {
             console.log(`✅ Using cached bot settings for: ${normalizedBotId}`);
             botSettings = cached.settings;
           } else {
-            botSettings = await BotSettings.findOne({ 
+            botSettings = await BotSettings.findOne({
               botId: normalizedBotId,
               'whatsapp.enabled': true,
               'whatsapp.accessToken': { $exists: true }
             }).select('botId name userId whatsapp welcomeMessage faqs documents urls structuredData updatedAt').lean() as any;
-            
+
             if (botSettings) {
               botSettingsCache.set(cacheKey, { settings: botSettings, timestamp: Date.now() });
             }
@@ -167,11 +167,11 @@ export async function handleWhatsAppMessage(webhookData: any, botId?: string) {
         } else {
           // Fallback: find first enabled bot
           console.log('🔍 No botId provided, searching for enabled bots...');
-          const bots = await BotSettings.find({ 
+          const bots = await BotSettings.find({
             'whatsapp.enabled': true,
             'whatsapp.accessToken': { $exists: true }
           }).select('botId name userId whatsapp welcomeMessage faqs documents urls structuredData updatedAt').lean() as any[];
-          
+
           if (bots.length > 0) {
             botSettings = bots[0];
             console.log(`✅ Using first enabled bot: ${botSettings.name} (${botSettings.botId})`);
@@ -225,7 +225,7 @@ export async function handleWhatsAppMessage(webhookData: any, botId?: string) {
 
         try {
           console.log(`🤖 Processing message with AI: "${text}"`);
-          
+
           // Process message with AI
           const reply = await processChatMessage(
             botSettings,
@@ -265,13 +265,13 @@ export async function handleWhatsAppMessage(webhookData: any, botId?: string) {
         } catch (error: any) {
           console.error('❌ Error handling WhatsApp message:', error);
           console.error('Error details:', error instanceof Error ? error.stack : error);
-          
+
           const errorMsg = error.message?.includes('timeout')
             ? 'Xin lỗi, yêu cầu của bạn mất quá nhiều thời gian để xử lý. Vui lòng thử lại sau.'
             : error.message?.includes('Rate limit')
-            ? 'Xin lỗi, hệ thống đang quá tải. Vui lòng thử lại sau vài giây.'
-            : 'Xin lỗi, tôi đang gặp sự cố khi xử lý tin nhắn của bạn. Vui lòng thử lại sau.';
-          
+              ? 'Xin lỗi, hệ thống đang quá tải. Vui lòng thử lại sau vài giây.'
+              : 'Xin lỗi, tôi đang gặp sự cố khi xử lý tin nhắn của bạn. Vui lòng thử lại sau.';
+
           try {
             await sendWhatsAppMessage(
               botSettings.whatsapp.accessToken,
@@ -308,7 +308,7 @@ export async function setWhatsAppWebhook(
     // Note: WhatsApp webhook is typically configured in Meta Business Suite
     // This function can be used to verify webhook configuration
     const url = `https://graph.facebook.com/v18.0/${phoneNumberId}/subscribed_apps`;
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -347,7 +347,7 @@ export async function setWhatsAppWebhook(
 export async function getWhatsAppPhoneNumberInfo(accessToken: string, phoneNumberId: string) {
   try {
     const url = `https://graph.facebook.com/v18.0/${phoneNumberId}?fields=display_phone_number,verified_name`;
-    
+
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
