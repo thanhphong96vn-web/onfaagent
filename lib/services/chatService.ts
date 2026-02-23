@@ -293,6 +293,16 @@ function getOpenAIClient(apiKey: string): OpenAI {
 }
 
 /**
+ * Detect the language of a message based on character analysis.
+ * Returns 'Vietnamese' if Vietnamese diacritical marks are found, otherwise 'English'.
+ */
+function detectLanguage(text: string): string {
+  const vietnamesePattern = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+  if (vietnamesePattern.test(text)) return 'Vietnamese';
+  return 'English';
+}
+
+/**
  * Generate system prompt for OpenAI - OPTIMIZED STRUCTURE WITH CACHING
  */
 export function generateSystemPrompt(botSettings: IBotSettings, platform?: string, maxKbLength?: number): string {
@@ -330,34 +340,35 @@ Knowledge Base:
 ${knowledgeBase}
 
 CRITICAL INSTRUCTIONS - READ CAREFULLY:
-1. MANDATORY SEARCH: You MUST search through the ENTIRE knowledge base above before responding to ANY question
-2. USE KNOWLEDGE BASE: The knowledge base contains FAQs, documents, URLs, and structured data - you MUST use them
-3. MATCHING LOGIC: If the user's question matches ANY part of the knowledge base (even partial matches, synonyms, or related terms), you MUST provide that information
-4. NEVER SAY "I DON'T KNOW" unless you have searched EVERY section (FAQs, Documents, URLs, Structured Data) and found ABSOLUTELY NOTHING related
-5. SEARCH EXAMPLES:
+1. LANGUAGE MATCHING (HIGHEST PRIORITY): You MUST ALWAYS respond in the SAME language the user writes in. Detect the language of the user's message and use that language for your ENTIRE response — including all headers, labels, bullet points, and conclusions. If the user writes in English, ALL text must be in English. If the user writes in Vietnamese, ALL text must be in Vietnamese. This rule overrides all example templates below. NEVER default to Vietnamese unless the user writes in Vietnamese.
+2. MANDATORY SEARCH: You MUST search through the ENTIRE knowledge base above before responding to ANY question
+3. USE KNOWLEDGE BASE: The knowledge base contains FAQs, documents, URLs, and structured data - you MUST use them
+4. MATCHING LOGIC: If the user's question matches ANY part of the knowledge base (even partial matches, synonyms, or related terms), you MUST provide that information
+5. NEVER SAY "I DON'T KNOW" unless you have searched EVERY section (FAQs, Documents, URLs, Structured Data) and found ABSOLUTELY NOTHING related
+6. SEARCH EXAMPLES:
    - If user asks "The Golden Era", search for: "Golden Era", "golden era", "Golden", "Era", "NFT", "mining", "khai thác"
    - If user asks "Wonderful Holiday", search for: "Wonderful", "Holiday", "wonderful", "holiday", "NFT", "collection"
    - If user asks about any NFT, search ALL FAQs for that NFT name, related terms, and synonyms
-6. ANSWER FORMAT:
+7. ANSWER FORMAT:
    - STRUCTURE: Use a structured, "report-like" format with clear sections.
-   - HEADERS: Use emojis + capitalized headers for each section (e.g., "📊 TÍNH TOÁN LỢI NHUẬN", "💰 THÔNG TIN CHI TIẾT").
+   - HEADERS: Use emojis + capitalized headers for each section. Write headers in the user's language (e.g., English: "📊 PROFIT CALCULATION", "💰 DETAILS" / Vietnamese: "📊 TÍNH TOÁN LỢI NHUẬN", "💰 THÔNG TIN CHI TIẾT").
    - SEPARATORS: Use dividing lines (e.g., "--------------------") between sections to create a clean visual layout.
    - LISTS: Present data and key points vertically using bullet points. Avoid long paragraphs.
    - EMOJIS: Use relevant emojis for EVERY bullet point to make it visually engaging (e.g., 💵 for money, 📈 for charts, ✅ for results).
    - LENGTH: Do not be afraid to make the response long and vertical. Use whitespace effectively.
-7. COMPLETE ANSWERS: Provide complete answers with all relevant details from the knowledge base.
-8. BE THOROUGH: Read through ALL FAQs carefully - they contain the most important information.
-9. TONE & STYLE: Be professional yet friendly. Use a "Financial Advisor" or "Expert Support" persona.
-10. EXAMPLE FORMAT:
-   "[Emoji] [HEADER TITLE]
+8. COMPLETE ANSWERS: Provide complete answers with all relevant details from the knowledge base.
+9. BE THOROUGH: Read through ALL FAQs carefully - they contain the most important information.
+10. TONE & STYLE: Be professional yet friendly. Use a "Financial Advisor" or "Expert Support" persona.
+11. EXAMPLE FORMAT:
+   "[Emoji] [HEADER IN USER'S LANGUAGE]
    --------------------
-   [Emoji] [Sub-header if needed]
+   [Emoji] [Sub-header in user's language]
    - [Emoji] Point 1
    - [Emoji] Point 2: Value
 
    --------------------
-   [Emoji] [Conclusion/Summary]
-   [Text]"
+   [Emoji] [Conclusion/Summary in user's language]
+   [Text in user's language]"
 
 REMEMBER: The knowledge base above is YOUR ONLY SOURCE OF INFORMATION. If information exists there, you MUST find it and provide it. Only say "I don't have that information" if you have searched EVERYTHING and found NOTHING.
 
@@ -397,10 +408,12 @@ export async function* processChatMessageStream(
   const openai = getOpenAIClient(apiKey);
 
   try {
+    const userLang = detectLanguage(message);
     const stream = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
+        { role: 'system', content: `CRITICAL: The user is writing in ${userLang}. You MUST respond entirely in ${userLang}. Every header, label, bullet point, and sentence must be in ${userLang}.` },
         { role: 'user', content: message }
       ],
       max_tokens: 500,
@@ -504,27 +517,28 @@ export async function processChatMessage(
 - Current Price: $${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
 - Total Initial Value (Deposit): $${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
 - INSTRUCTION: 
-  1. Use the "Knowledge Base" to find current Interest Rates (Lãi suất) and Terms (Kỳ hạn) for ${queryCoin}.
+  1. Use the "Knowledge Base" to find current Interest Rates and Terms for ${queryCoin}.
   2. If found, calculate the estimated profit.
-  3. Respond using the STRICT FORMAT below (matches user screenshot):
+  3. LANGUAGE: Respond in the SAME language the user wrote in. Use the format below but translate ALL labels to match the user's language.
+  4. Respond using the STRICT FORMAT below:
   
-  📊 Tính Toán Lợi Nhuận Dự Kiến
+  📊 [Estimated Profit Calculation / Tính Toán Lợi Nhuận Dự Kiến]
   --------------------
-  💰 Thông Tin Deposit
+  💰 [Deposit Info / Thông Tin Deposit]
   - Token: ${queryCoin.toUpperCase()}
-  - Số lượng: ${calcAmount.toLocaleString()} ${queryCoin.toUpperCase()}
-  - Giá hiện tại: $${currentPrice} /token
-  - Giá trị USD: $${totalValue.toLocaleString()}
+  - [Quantity / Số lượng]: ${calcAmount.toLocaleString()} ${queryCoin.toUpperCase()}
+  - [Current Price / Giá hiện tại]: $${currentPrice} /token
+  - [USD Value / Giá trị USD]: $${totalValue.toLocaleString()}
 
-  📈 Thông Tin Lợi Nhuận
-  - Kỳ hạn: [Found in KB, e.g., 30 ngày]
-  - Lãi suất: [Found in KB, e.g., 7-12%/tháng]
+  📈 [Profit Info / Thông Tin Lợi Nhuận]
+  - [Term / Kỳ hạn]: [Found in KB]
+  - [Interest Rate / Lãi suất]: [Found in KB]
   
-  ✅ Kết Quả Sau [Term]
-  - Lợi nhuận: [Calculate: Value * Rate]
-  - Tổng nhận: [Calculate: Value + Profit]
+  ✅ [Results After Term / Kết Quả Sau Kỳ Hạn]
+  - [Profit / Lợi nhuận]: [Calculate: Value * Rate]
+  - [Total Received / Tổng nhận]: [Calculate: Value + Profit]
 
-  📝 Cân bằng giữa lợi nhuận và rủi ro
+  📝 [Balance between profit and risk / Cân bằng giữa lợi nhuận và rủi ro]
 `;
             cryptoData += calcContext;
           }
@@ -537,6 +551,10 @@ export async function processChatMessage(
       console.error('Error fetching crypto data:', err);
     }
   }
+
+  // Detect user language for response language matching
+  const userLang = detectLanguage(message);
+  const langMessage = `CRITICAL: The user is writing in ${userLang}. You MUST respond entirely in ${userLang}. Every header, label, bullet point, and sentence must be in ${userLang}.`;
 
   // Try with optimized knowledge base first
   try {
@@ -555,36 +573,39 @@ export async function processChatMessage(
 ${cryptoData}
 [INSTRUCTION: Use the above Live Market Data to answer questions about price/market. It overrides any other information.]
 [NOTE: OFT is the ticker symbol for ONFA. If user asks about OFT, use the ONFA data above.]
-[FORMATTING REQUIREMENT: You MUST use the following format for ANY coin price response:]
+[FORMATTING REQUIREMENT: You MUST use the following format for ANY coin price response.]
 [CRITICAL: Do not add any extra dashes or lines at the very bottom.]
-[CRITICAL: Bold ONLY the keys (e.g., **Giá hiện tại:**), NOT the values.]
+[CRITICAL: Bold ONLY the keys, NOT the values.]
+[LANGUAGE RULE: ALL labels below MUST be written in the SAME language the user used. If user writes in English, use English labels. If user writes in Vietnamese, use Vietnamese labels.]
 
-📊 GIÁ [TOKEN NAME] ([SYMBOL])
+📊 [PRICE OF / GIÁ] [TOKEN NAME] ([SYMBOL])
 --------------------
-• **Giá hiện tại:** $[Price]
-• **Thay đổi trong 24 giờ:** [Change]% [Trend Emoji]
-• **Cập nhật:** [Time] (Nguồn: CoinGecko)
-
---------------------
-💡 Thông tin bổ sung
-• [Write 1-2 positive/neutral sentences about the trend]
+• **[Current Price / Giá hiện tại]:** $[Price]
+• **[24h Change / Thay đổi trong 24 giờ]:** [Change]% [Trend Emoji]
+• **[Updated / Cập nhật]:** [Time] ([Source / Nguồn]: CoinGecko)
 
 --------------------
-📈 Kết luận
-[Summary sentence about the price action]
+💡 [Additional Info / Thông tin bổ sung]
+• [Write 1-2 positive/neutral sentences about the trend IN THE USER'S LANGUAGE]
 
-Hãy theo dõi thường xuyên để cập nhật thông tin mới nhất!
+--------------------
+📈 [Conclusion / Kết luận]
+[Summary sentence about the price action IN THE USER'S LANGUAGE]
+
+[Closing message in the user's language]
 ---------------------------------------------------
 `;
       systemPrompt = cryptoInjection + systemPrompt;
       console.log('✅ Injected crypto data at START of system prompt');
     }
 
+
     const completion = await Promise.race([
       openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
+          { role: 'system', content: langMessage },
           { role: 'user', content: message }
         ],
         max_tokens: 500, // Reduced from 600 to 500 for faster generation
@@ -630,6 +651,7 @@ Hãy theo dõi thường xuyên để cập nhật thông tin mới nhất!
             model: 'gpt-4o-mini',
             messages: [
               { role: 'system', content: reducedPrompt },
+              { role: 'system', content: `CRITICAL: The user is writing in ${userLang}. You MUST respond entirely in ${userLang}. Every header, label, bullet point, and sentence must be in ${userLang}.` },
               { role: 'user', content: message }
             ],
             max_tokens: 400, // Reduced for faster fallback responses
