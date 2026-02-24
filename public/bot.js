@@ -187,10 +187,10 @@
         --chatbot-primary-hover: ${adjustColor(themeColor, -20)};
         --chatbot-primary-light: ${adjustColor(themeColor, 40)};
         
-        /* Theme variables - Light mode */
-        --chatbot-bg: #ffffff;
+        /* Theme variables */
+        --chatbot-bg: rgba(255, 255, 255, 0.95);
         --chatbot-text: #374151;
-        --chatbot-bot-msg-bg: #e8e9ec;
+        --chatbot-bot-msg-bg: #f3f4f6;
         --chatbot-bot-msg-text: #374151;
         --chatbot-input-bg: #ffffff;
         --chatbot-input-text: #374151;
@@ -285,13 +285,13 @@
         transform: scale(0.95);
       }
 
-      #chatbot-widget .chatbot-modal {
+      .chatbot-modal {
         position: absolute;
         bottom: 170px;
         right: 0;
         width: 380px;
         height: 520px;
-        background: var(--chatbot-bg) !important;
+        background: var(--chatbot-bg);
         backdrop-filter: blur(20px);
         border-radius: 20px;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
@@ -299,7 +299,7 @@
         flex-direction: column;
         overflow: hidden;
         transition: bottom 0.3s ease-out, background 0.3s ease;
-        color: var(--chatbot-text) !important;
+        color: var(--chatbot-text);
       }
 
       @media (max-width: 768px) {
@@ -405,14 +405,13 @@
         transform: rotate(45deg);
       }
 
-      #chatbot-widget .chatbot-messages {
+      .chatbot-messages {
         flex: 1;
         padding: 16px;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
         gap: 12px;
-        background: var(--chatbot-bg) !important;
       }
 
       .chatbot-message {
@@ -480,12 +479,12 @@
         border-bottom-right-radius: 4px;
       }
 
-      #chatbot-widget .chatbot-input-container {
+      .chatbot-input-container {
         padding: 16px;
         border-top: 1px solid var(--chatbot-border);
         display: flex;
         gap: 8px;
-        background: var(--chatbot-bg) !important;
+        background: var(--chatbot-bg);
       }
 
       #chatbot-input {
