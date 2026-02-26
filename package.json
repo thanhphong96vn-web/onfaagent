@@ -15,6 +15,7 @@
     "worker:whatsapp-web": "tsx scripts/whatsapp-web-worker.ts",
     "worker:discord": "tsx scripts/discord-worker.ts",
     "worker:all": "concurrently \"npm run worker:telegram\" \"npm run worker:whatsapp-web\" \"npm run worker:discord\" --names \"TELEGRAM,WHATSAPP,DISCORD\" --prefix-colors \"blue,green,magenta\"",
+    "worker:render": "tsx scripts/render-worker.ts",
     "list-kb": "tsx scripts/list-knowledge-base.ts",
     "delete-bot": "tsx scripts/delete-bot.ts",
     "check-kb": "tsx scripts/check-knowledge-base-source.ts",

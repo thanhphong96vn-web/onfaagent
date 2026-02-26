@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: onfaagent-workers
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm run worker:render
+    healthCheckPath: /health
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: COINGECKO_API_KEY
+        sync: false
+      - key: ENABLE_TELEGRAM
+        value: "true"
+      - key: ENABLE_DISCORD
+        value: "true"
+      - key: ENABLE_WHATSAPP
+        value: "false"
