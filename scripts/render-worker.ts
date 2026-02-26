@@ -35,7 +35,7 @@ import path from 'path';
 const PORT = parseInt(process.env.PORT || '10000', 10);
 const ENABLE_TELEGRAM = process.env.ENABLE_TELEGRAM !== 'false'; // enabled by default
 const ENABLE_DISCORD = process.env.ENABLE_DISCORD !== 'false';   // enabled by default
-const ENABLE_WHATSAPP = process.env.ENABLE_WHATSAPP === 'true';  // disabled by default (needs Puppeteer/Chromium)
+const ENABLE_WHATSAPP = process.env.ENABLE_WHATSAPP !== 'false';  // enabled by default
 
 // Track worker processes
 const workers: { name: string; process: ChildProcess; status: string; startedAt: Date; restarts: number }[] = [];
