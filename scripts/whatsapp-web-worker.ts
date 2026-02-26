@@ -62,7 +62,7 @@ async function connectDB() {
     const dbName = mongoose.connection.db?.databaseName || 'unknown';
     console.log(`✅ Connected to MongoDB`);
     console.log(`   Active database: ${dbName}`);
-    
+
     return mongoose.connection;
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);
@@ -78,7 +78,7 @@ async function getBotSettings(botId: string): Promise<any | null> {
 
   const cacheKey = `whatsapp_web_${botId}`;
   const cached = botSettingsCache.get(cacheKey);
-  
+
   // Check cache validity - also check if updatedAt has changed
   if (cached && Date.now() - cached.timestamp < BOT_SETTINGS_CACHE_TTL) {
     // Double-check: reload from DB if cache is older than 30 seconds to catch recent updates
@@ -111,7 +111,7 @@ async function sendMessage(client: Client, to: string, message: string): Promise
   // Handle both @c.us and @lid formats
   let chatId: string;
   const isLidChat = to.includes('@lid');
-  
+
   if (to.includes('@')) {
     // Already has format like 84922156755@c.us or 206206329217189@lid
     chatId = to;
@@ -120,10 +120,10 @@ async function sendMessage(client: Client, to: string, message: string): Promise
     const phoneNumber = to.replace(/[^0-9]/g, '');
     chatId = `${phoneNumber}@c.us`;
   }
-  
+
   const maxRetries = isLidChat ? 3 : 2; // More retries for @lid chats
   let lastError: any = null;
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       // Always get the chat first - this ensures it's loaded
@@ -140,11 +140,11 @@ async function sendMessage(client: Client, to: string, message: string): Promise
           throw new Error(`Chat ${chatId} not found after ${maxRetries} attempts`);
         }
       }
-      
+
       // Use chat.sendMessage() instead of client.sendMessage() for more reliability
       // This ensures we're sending to a loaded chat object
       const sentMessage = await chat.sendMessage(message);
-      
+
       // Verify message was actually sent by checking for message ID
       if (sentMessage && sentMessage.id) {
         console.log(`✅ Message sent to ${chatId} (ID: ${sentMessage.id._serialized || sentMessage.id})`);
@@ -154,13 +154,13 @@ async function sendMessage(client: Client, to: string, message: string): Promise
       }
     } catch (error: any) {
       lastError = error;
-      
+
       // Check if it's the markedUnread/sendSeen error
-      const isSendSeenError = error.message?.includes('markedUnread') || 
-                             error.message?.includes('Cannot read properties of undefined') ||
-                             error.message?.includes('sendSeen') ||
-                             (error.stack && error.stack.includes('sendSeen'));
-      
+      const isSendSeenError = error.message?.includes('markedUnread') ||
+        error.message?.includes('Cannot read properties of undefined') ||
+        error.message?.includes('sendSeen') ||
+        (error.stack && error.stack.includes('sendSeen'));
+
       if (isSendSeenError && attempt < maxRetries) {
         console.warn(`⚠️ sendSeen error for ${chatId} (attempt ${attempt}/${maxRetries}), retrying...`);
         // Wait longer for @lid chats, shorter for @c.us chats
@@ -168,7 +168,7 @@ async function sendMessage(client: Client, to: string, message: string): Promise
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue; // Retry
       }
-      
+
       // For sendSeen errors on last attempt, try one more time with client.sendMessage as fallback
       if (isSendSeenError && attempt === maxRetries) {
         console.warn(`⚠️ sendSeen error persisted, trying fallback method...`);
@@ -183,18 +183,18 @@ async function sendMessage(client: Client, to: string, message: string): Promise
           console.error(`❌ Fallback method also failed:`, fallbackError);
         }
       }
-      
+
       // For other errors or if all retries failed, throw
       if (attempt === maxRetries) {
         console.error(`❌ Error sending message to ${chatId} after ${maxRetries} attempts:`, error);
         throw error;
       }
-      
+
       // Wait before retrying for non-sendSeen errors
       await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
     }
   }
-  
+
   // Should not reach here, but if we do, throw the last error
   throw lastError || new Error('Failed to send message after retries');
 }
@@ -237,7 +237,7 @@ async function handleMessage(client: Client, botSettings: any, msg: any) {
 
   try {
     console.log(`🤖 Processing message with AI: "${text}"`);
-    
+
     // Debug: Log botSettings structure
     console.log(`[WHATSAPP] Bot settings check:`);
     console.log(`[WHATSAPP]   Bot ID: ${botSettings.botId}`);
@@ -245,7 +245,7 @@ async function handleMessage(client: Client, botSettings: any, msg: any) {
     console.log(`[WHATSAPP]   Documents count: ${botSettings.documents?.filter((d: any) => d.enabled)?.length || 0}`);
     console.log(`[WHATSAPP]   URLs count: ${botSettings.urls?.filter((u: any) => u.enabled)?.length || 0}`);
     console.log(`[WHATSAPP]   Structured data count: ${botSettings.structuredData?.filter((s: any) => s.enabled)?.length || 0}`);
-    
+
     const reply = await processChatMessage(
       botSettings,
       text,
@@ -282,8 +282,8 @@ async function handleMessage(client: Client, botSettings: any, msg: any) {
     const errorMsg = error.message?.includes('timeout')
       ? 'Xin lỗi, yêu cầu của bạn mất quá nhiều thời gian để xử lý. Vui lòng thử lại sau.'
       : error.message?.includes('Rate limit')
-      ? 'Xin lỗi, hệ thống đang quá tải. Vui lòng thử lại sau vài giây.'
-      : 'Xin lỗi, tôi đang gặp sự cố khi xử lý tin nhắn của bạn. Vui lòng thử lại sau.';
+        ? 'Xin lỗi, hệ thống đang quá tải. Vui lòng thử lại sau vài giây.'
+        : 'Xin lỗi, tôi đang gặp sự cố khi xử lý tin nhắn của bạn. Vui lòng thử lại sau.';
 
     try {
       await sendMessage(client, from, errorMsg);
@@ -354,7 +354,7 @@ async function startClient(botId: string) {
         '--password-store=basic',
         '--use-mock-keychain'
       ],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (process.platform === 'linux' ? '/usr/bin/chromium' : undefined)
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
     }
   });
 
@@ -364,7 +364,7 @@ async function startClient(botId: string) {
     try {
       const qrDataUrl = await qrcode.toDataURL(qr);
       console.log(`✅ QR Code generated (data URL length: ${qrDataUrl.length})`);
-      
+
       // Lưu QR code vào MongoDB
       await connectDB();
       await BotSettings.updateOne(
@@ -376,7 +376,7 @@ async function startClient(botId: string) {
           }
         }
       );
-      
+
       console.log(`✅ QR Code saved to database for bot: ${botId}`);
       console.log(`💡 Please scan the QR code with WhatsApp to authenticate`);
     } catch (error) {
@@ -392,7 +392,7 @@ async function startClient(botId: string) {
       console.log(`   Phone: ${client.info.wid.user}`);
       console.log(`   Name: ${client.info.pushname || 'N/A'}`);
     }
-    
+
     // Lưu thông tin phone và xóa QR code khỏi database khi đã authenticated
     try {
       await connectDB();
@@ -480,7 +480,7 @@ async function main() {
     console.warn('⚠️ No enabled WhatsApp bots found in database');
     console.log('💡 Please enable at least one bot in the dashboard');
     console.log('🔄 Will retry in 30 seconds...');
-    
+
     setTimeout(() => {
       console.log('🔄 Retrying to find enabled bots...');
       main().catch((error) => {
@@ -529,7 +529,7 @@ async function main() {
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 Shutting down gracefully...');
-  
+
   // Destroy all clients
   const clients = Array.from(clientInstances.values());
   for (const client of clients) {
