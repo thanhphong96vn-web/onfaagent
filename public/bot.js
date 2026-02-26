@@ -188,8 +188,6 @@
       #chatbot-widget *::before,
       #chatbot-widget *::after {
         box-sizing: border-box !important;
-        margin: 0;
-        line-height: normal;
       }
 
       #chatbot-widget {
