@@ -18,6 +18,4 @@ services:
       - key: ENABLE_DISCORD
         value: "true"
       - key: ENABLE_WHATSAPP
-        value: "true"
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
         value: "false"

@@ -24,7 +24,7 @@
  *   OPENAI_API_KEY   - OpenAI API key
  *   ENABLE_TELEGRAM  - Set to "false" to disable (default: enabled)
  *   ENABLE_DISCORD   - Set to "false" to disable (default: enabled)
- *   ENABLE_WHATSAPP  - Set to "false" to disable (default: enabled)
+ *   ENABLE_WHATSAPP  - Set to "true" to enable (default: disabled, needs too much RAM)
  */
 
 import http from 'http';
@@ -37,7 +37,7 @@ import path from 'path';
 const PORT = parseInt(process.env.PORT || '10000', 10);
 const ENABLE_TELEGRAM = process.env.ENABLE_TELEGRAM !== 'false'; // enabled by default
 const ENABLE_DISCORD = process.env.ENABLE_DISCORD !== 'false';   // enabled by default
-const ENABLE_WHATSAPP = process.env.ENABLE_WHATSAPP !== 'false';  // enabled by default
+const ENABLE_WHATSAPP = process.env.ENABLE_WHATSAPP === 'true';  // disabled by default (Chromium uses too much RAM for Render free tier)
 
 // ============================================================
 // Log buffer (circular buffer for recent logs)
